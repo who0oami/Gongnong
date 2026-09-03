@@ -216,3 +216,46 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+
+# ==========================================
+# KSL-Tube Project
+# ==========================================
+
+# Environment variables
+.env.*
+!.env.example
+
+# AI Hub / raw datasets
+data/raw/
+data/videos/
+data/datasets/
+
+# Video files
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Compressed datasets
+*.zip
+*.tar
+*.gz
+*.7z
+
+# AI model weights
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+
+# Generated outputs
+outputs/
+results/
+temp/
+
+# OS files
+.DS_Store
+Thumbs.db
