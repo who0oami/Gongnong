@@ -1,8 +1,8 @@
 from fastapi import APIRouter
-from schemas.youtube import YoutubeRequest
+from schemas.youtube import YoutubeRequest, YoutubeResponse
 
 router = APIRouter()
 
-@router.post("/translate")
+@router.post("/translate", response_model=YoutubeResponse)
 def translate(request: YoutubeRequest):
-    return {"received_url": request.url}
+    return YoutubeResponse(received_url=request.url)
