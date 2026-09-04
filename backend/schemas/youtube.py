@@ -14,5 +14,7 @@ class YoutubeRequest(BaseModel):
 
         return value
 
+
 class YoutubeResponse(BaseModel):
     received_url: str
+    transcript: str
