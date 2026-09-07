@@ -1,0 +1,6 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KSL 키포인트 → Babylon.js 검증</title><script src="https://cdn.babylonjs.com/babylon.js"></script><script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script><link rel="stylesheet" href="style.css"></head>
+<body><header><div><h1>수어 리타기팅 검증</h1><p><b>추억</b> · WORD1202 · 정면 · OpenPose 2D 57프레임</p></div><div id="status">불러오는 중…</div></header>
+<main><section class="panel"><div class="stage"><video id="sourceVideo" src="sample/word1202_memory.mp4" controls muted playsinline></video><canvas id="overlay"></canvas></div><div class="legend">하늘색 몸 · 노랑 왼손 · 분홍 오른손 · 초록 얼굴</div></section>
+<section class="panel"><canvas id="renderCanvas"></canvas><div class="toolbar"><label><input id="retarget" type="checkbox" checked> 아바타 적용</label><label><input id="showFace" type="checkbox" checked> 표정 적용</label><button id="reset">기본 자세</button></div></section></main>
+<aside><b>현재 프레임 <span id="frameNo">0</span>/56</b><span>2D 기반 1차 판별용: 손가락·팔 윤곽·눈/입은 확인 가능하지만 깊이와 손목 비틀림은 추정값입니다.</span></aside><script src="app.js?v=5"></script></body></html>
