@@ -1,5 +1,6 @@
 from pydantic import BaseModel, field_validator
 
+
 class YoutubeRequest(BaseModel):
     url: str
 
@@ -15,6 +16,13 @@ class YoutubeRequest(BaseModel):
         return value
 
 
+class Segment(BaseModel):
+    start: float
+    end: float
+    text: str
+
+
 class YoutubeResponse(BaseModel):
     received_url: str
     transcript: str
+    segments: list[Segment]

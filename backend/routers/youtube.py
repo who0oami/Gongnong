@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from schemas.youtube import YoutubeRequest, YoutubeResponse
-from services.youtube_service import extract_video_id, get_transcript_text
+from services.youtube_service import extract_video_id, get_transcript_data
 
 router = APIRouter()
+
 
 @router.post("/translate", response_model=YoutubeResponse)
 def translate(request: YoutubeRequest):
@@ -12,8 +13,12 @@ def translate(request: YoutubeRequest):
         raise HTTPException(status_code=400, detail="URL에서 영상 ID를 찾을 수 없습니다.")
 
     try:
-        transcript = get_transcript_text(video_id)
+        full_text, segments = get_transcript_data(video_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    return YoutubeResponse(received_url=request.url, transcript=transcript)
+    return YoutubeResponse(
+        received_url=request.url,
+        transcript=full_text,
+        segments=segments,
+    )
