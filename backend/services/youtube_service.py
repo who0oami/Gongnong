@@ -72,6 +72,9 @@ def group_into_sentences(raw_entries: list) -> list[dict]:
     sentence_endings = (".", "?", "!")
     ending_words = ("요", "다", "죠", "네요", "가요", "까요", "습니다", "니다")
 
+    MAX_SEGMENT_DURATION = 6.0
+    MAX_FRAGMENTS = 4
+
     segments = []
     buffer_texts = []
     buffer_start = None
@@ -94,7 +97,13 @@ def group_into_sentences(raw_entries: list) -> list[dict]:
             or text.rstrip(".!?").endswith(ending_words)
         )
 
-        if is_sentence_end:
+        duration_so_far = buffer_end - buffer_start
+        is_forced_break = (
+            duration_so_far >= MAX_SEGMENT_DURATION
+            or len(buffer_texts) >= MAX_FRAGMENTS
+        )
+
+        if is_sentence_end or is_forced_break:
             joined = " ".join(buffer_texts)
             corrected = correct_spelling(joined)
 
