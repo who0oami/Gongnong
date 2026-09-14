@@ -6,6 +6,7 @@ from pathlib import Path
 from services.clip_resolver import VIDEOS_DIR, resolve_clip_path
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "static" / "results"
+IDLE_IMAGE_PATH = Path(__file__).resolve().parent.parent / "static" / "images" / "idle_pose.png"
 
 WIDTH, HEIGHT, FPS = 1920, 1080, 30
 
@@ -34,6 +35,27 @@ def _make_black(tmp: Path, duration: float, idx: int) -> Path:
         "-f", "lavfi",
         "-i", f"color=c=black:s={WIDTH}x{HEIGHT}:r={FPS}:d={duration:.3f}",
         "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        str(out),
+    ])
+    return out
+
+
+def _make_idle_pose(tmp: Path, duration: float, idx: int) -> Path:
+    """기본 포즈 정지 이미지를 duration만큼 재생되는 영상으로 만든다.
+
+    이미지가 없으면 검은 화면(_make_black)으로 자동 대체한다.
+    """
+    if not IDLE_IMAGE_PATH.is_file():
+        return _make_black(tmp, duration, idx)
+
+    out = tmp / f"idle_{idx}.mp4"
+    vf = (
+        f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
+        f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2,fps={FPS}"
+    )
+    _run_ffmpeg([
+        "-loop", "1", "-i", str(IDLE_IMAGE_PATH), "-t", f"{duration:.3f}",
+        "-vf", vf, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
         str(out),
     ])
     return out
@@ -90,7 +112,7 @@ def merge_timeline_to_video(timeline: list[dict], output_filename: str) -> str:
         for segment in timeline:
             gap = segment["stt_start"] - prev_end
             if gap > _GAP_EPSILON:
-                master_parts.append(_make_black(tmp, gap, next(counter)))
+                master_parts.append(_make_idle_pose(tmp, gap, next(counter)))
 
             item_parts: list[Path] = []
             for item in segment["items"]:
@@ -99,7 +121,7 @@ def merge_timeline_to_video(timeline: list[dict], output_filename: str) -> str:
 
                 clip_url = resolve_clip_path(item["code"])
                 if clip_url is None:
-                    item_parts.append(_make_black(tmp, MISSING_CLIP_FALLBACK_SECONDS, next(counter)))
+                    item_parts.append(_make_idle_pose(tmp, MISSING_CLIP_FALLBACK_SECONDS, next(counter)))
                 else:
                     src = VIDEOS_DIR / f"{item['code']}.mp4"
                     item_parts.append(_normalize_clip(tmp, src, next(counter)))
@@ -112,7 +134,7 @@ def merge_timeline_to_video(timeline: list[dict], output_filename: str) -> str:
 
             trailing = [p for p in (seg_base,) if p is not None]
             if segment["idle_duration"] > _GAP_EPSILON:
-                trailing.append(_make_black(tmp, segment["idle_duration"], next(counter)))
+                trailing.append(_make_idle_pose(tmp, segment["idle_duration"], next(counter)))
 
             if trailing:
                 seg_final = _concat(tmp, trailing, next(counter)) if len(trailing) > 1 else trailing[0]
