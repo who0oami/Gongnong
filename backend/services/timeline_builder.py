@@ -41,7 +41,11 @@ def build_timeline(
     최종 타임라인을 계산한다."""
 
     n = len(stt_segments)
-    items_per_segment = [build_display_sequence(seg["gloss_sequence"]) for seg in stt_segments]
+    items_per_segment = [
+        seg["display_sequence"] if "display_sequence" in seg
+        else build_display_sequence(seg["gloss_sequence"])
+        for seg in stt_segments
+    ]
     raw = [
         _raw_stats(stt_segments[i], items_per_segment[i], get_duration)
         for i in range(n)

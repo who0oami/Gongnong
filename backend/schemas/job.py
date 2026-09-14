@@ -23,6 +23,7 @@ class JobSegment(BaseModel):
 class JobResult(BaseModel):
     transcript: str
     segments: list[JobSegment]
+    video_url: Optional[str] = None
 
 
 class Job(BaseModel):

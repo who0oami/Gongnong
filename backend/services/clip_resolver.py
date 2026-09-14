@@ -1,9 +1,12 @@
-# TODO: 실제 Avatar 데이터 정리 완료 후, 이 함수 내부만 교체 예정
-# word3000_mapping.csv의 morpheme_path, sen_sentence_mapping.csv의
-# source_file 등을 참고해서 실제 경로 규칙 확정 필요
-# (현재는 더미 경로 문자열만 생성)
+from pathlib import Path
+
+VIDEOS_DIR = Path(__file__).resolve().parent.parent / "static" / "videos"
+
+
 def resolve_clip_path(code: str) -> str | None:
-    return f"data/videos/{code}.mp4"
+    if not (VIDEOS_DIR / f"{code}.mp4").is_file():
+        return None
+    return f"/static/videos/{code}.mp4"
 
 
 def resolve_clips(display_sequence: list[dict]) -> list[dict]:
