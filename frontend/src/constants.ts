@@ -9,37 +9,12 @@ export const ICON = {
   star: "M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm4.24 16L12 15.45 7.77 18l1.12-4.81-3.73-3.23 4.92-.42L12 5l1.92 4.53 4.92.42-3.73 3.23L16.23 18z",
   play: "M8 5v14l11-7z",
   pause: "M6 19h4V5H6v14zm8-14v14h4V5h-4z",
+  // Repeated across pages/components — shared here so the path data isn't duplicated per file.
+  chevronRight: "M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z",
+  close: "M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
+  folder: "M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z",
+  check: "M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
 } as const;
-
-export interface Subtitle {
-  start: number;
-  end: number;
-  text: string;
-  lowConf?: boolean;
-}
-
-export const SUBS: Subtitle[] = [
-  { start: 2, end: 6, text: "안녕하세요, 오늘은 AI 수어 통역 서비스를 소개하겠습니다." },
-  { start: 7, end: 12, text: "유튜브 영상 링크를 입력하면 자동으로 수어로 변환됩니다.", lowConf: true },
-  { start: 13, end: 18, text: "원본 영상과 수어 영상이 나란히 동기화되어 재생됩니다." },
-  { start: 19, end: 24, text: "농인 사용자가 영상 콘텐츠를 수어로 이해할 수 있습니다.", lowConf: true },
-  { start: 25, end: 30, text: "Sign Avatar가 자연스러운 수어 동작을 표현합니다." },
-];
-
-export interface ProcStepDef {
-  label: string;
-  desc: string;
-  duration: number;
-}
-
-export const PROC_STEPS: ProcStepDef[] = [
-  { label: "영상 정보 확인", desc: "제목, 재생 시간 확인 중...", duration: 2000 },
-  { label: "음성 추출 (STT)", desc: "영상 음성을 텍스트로 변환 중...", duration: 3000 },
-  { label: "문맥 이해 (LLM)", desc: "AI가 문장을 분석하고 정리 중...", duration: 2500 },
-  { label: "수어 동작 생성", desc: "수어 동작 시퀀스 생성 중...", duration: 3000 },
-  { label: "수어 영상 렌더링", desc: "Sign Avatar 영상을 렌더링 중...", duration: 2000 },
-];
-export const TOTAL = PROC_STEPS.reduce((a, s) => a + s.duration, 0);
 
 export type LayoutId =
   | "side-by-side"
@@ -177,31 +152,6 @@ export const PREF_OPTIONS = [
   "글씨가 컸으면 좋겠어요",
   "버튼과 조작이 간단했으면 좋겠어요",
 ];
-
-export function vidId(u: string): string | null {
-  const m = (u || "").match(/(?:v=|youtu\.be\/)([^&?/]+)/);
-  return m ? m[1] : null;
-}
-
-export function thumbOf(u: string, q?: string): string {
-  const v = vidId(u);
-  return v ? `https://img.youtube.com/vi/${v}/${q || "mqdefault"}.jpg` : "";
-}
-
-export function parseDur(d: string): number {
-  const p = (d || "").split(":").map(Number);
-  return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p.length === 2 ? p[0] * 60 + p[1] : 0;
-}
-
-export function fmtWatch(secs: number): string {
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
-
-export function fmtTime(n: number): string {
-  return Math.floor(n / 60) + ":" + String(Math.floor(n % 60)).padStart(2, "0");
-}
 
 export const COLORS = {
   primary: "#10B45F",

@@ -1,7 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { useApp, useEasyMode } from "../state/AppContext";
 import { useModal } from "../state/ModalContext";
-import { AGE_OPTIONS, INFO, PREF_OPTIONS, TOPIC_OPTIONS, fmtWatch, parseDur } from "../constants";
+import { useAuth } from "../hooks/useAuth";
+import { AGE_OPTIONS, ICON, INFO, PREF_OPTIONS, TOPIC_OPTIONS } from "../constants";
+import { fmtWatch, parseDur } from "../utils/video";
 import { chip, knobStyle, sw } from "../styles";
 import avatar from "../assets/avatar.png";
 import logo from "../assets/logo.png";
@@ -10,6 +12,7 @@ export default function MyPage() {
   const easy = useEasyMode();
   const navigate = useNavigate();
   const { openModal } = useModal();
+  const { logout } = useAuth();
   const { profile, history, settings, setSettings, onboarding, setOnboarding, toggleOnboardingTopic, toggleOnboardingPref, setScreenView } =
     useApp();
 
@@ -127,7 +130,13 @@ export default function MyPage() {
             <p style={{ fontSize: "14px", fontWeight: 500, margin: 0 }}>자막 표시</p>
             <p style={{ fontSize: "12px", color: "#747C78", margin: "2px 0 0" }}>수어 영상과 함께 한국어 자막 표시</p>
           </div>
-          <button onClick={() => setSettings({ subtitles: !settings.subtitles })} style={sw(settings.subtitles)}>
+          <button
+            onClick={() => setSettings({ subtitles: !settings.subtitles })}
+            role="switch"
+            aria-checked={settings.subtitles}
+            aria-label="자막 표시"
+            style={sw(settings.subtitles)}
+          >
             <span style={knobStyle} />
           </button>
         </div>
@@ -136,7 +145,13 @@ export default function MyPage() {
             <p style={{ fontSize: "14px", fontWeight: 500, margin: 0 }}>신뢰도 낮은 구간 자동 자막 전환</p>
             <p style={{ fontSize: "12px", color: "#747C78", margin: "2px 0 0" }}>수어 변환 신뢰도가 낮은 구간에서 자막으로 자동 전환</p>
           </div>
-          <button onClick={() => setSettings({ autoSwitch: !settings.autoSwitch })} style={sw(settings.autoSwitch)}>
+          <button
+            onClick={() => setSettings({ autoSwitch: !settings.autoSwitch })}
+            role="switch"
+            aria-checked={settings.autoSwitch}
+            aria-label="신뢰도 낮은 구간 자동 자막 전환"
+            style={sw(settings.autoSwitch)}
+          >
             <span style={knobStyle} />
           </button>
         </div>
@@ -145,6 +160,7 @@ export default function MyPage() {
           <select
             value={settings.defaultSpeed}
             onChange={(e) => setSettings({ defaultSpeed: e.target.value })}
+            aria-label="기본 재생 속도"
             style={{ fontSize: "14px", border: "1px solid #E5E8E7", borderRadius: "12px", padding: "6px 12px", background: "#fff", color: "#171C19" }}
           >
             <option value="0.5">0.5x</option>
@@ -152,6 +168,7 @@ export default function MyPage() {
             <option value="1.0">1.0x</option>
             <option value="1.25">1.25x</option>
             <option value="1.5">1.5x</option>
+            <option value="2.0">2.0x</option>
           </select>
         </div>
       </div>
@@ -167,14 +184,17 @@ export default function MyPage() {
           >
             <span>{label}</span>
             <svg viewBox="0 0 24 24" style={{ width: "16px", height: "16px", fill: "#747C78" }}>
-              <path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+              <path d={ICON.chevronRight} />
             </svg>
           </button>
         ))}
       </div>
 
       <button
-        onClick={() => navigate("/")}
+        onClick={() => {
+          logout();
+          navigate("/");
+        }}
         className="hover-red-bg"
         style={{ width: "100%", padding: "14px", fontSize: "14px", fontWeight: 600, color: "#EF4444", background: "#fff", border: "1px solid #FEE2E2", borderRadius: "16px", cursor: "pointer" }}
       >

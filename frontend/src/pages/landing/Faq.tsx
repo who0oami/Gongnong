@@ -17,6 +17,7 @@ export default function Faq() {
               <div key={q.q} style={{ borderBottom: i < FAQS.length - 1 ? "1px solid #E5E8E7" : "none", background: open ? "#F7FBF8" : "#fff" }}>
                 <button
                   onClick={() => setOpenIndex((cur) => (cur === i ? null : i))}
+                  aria-expanded={open}
                   className="hover-muted"
                   style={{
                     width: "100%",

@@ -1,22 +1,51 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useModal } from "../state/ModalContext";
+import { useAuth } from "../hooks/useAuth";
+import { ApiError } from "../api/client";
+import TextField from "../components/common/TextField";
 import logo from "../assets/logo.png";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { openModal } = useModal();
+  const { login, loginDemo } = useAuth();
   const [id, setId] = useState("");
   const [pw, setPw] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function submit() {
+  async function submit() {
     if (!id || !pw) {
       setError("아이디와 비밀번호를 입력해주세요.");
       return;
     }
     setError("");
-    navigate("/home");
+    setSubmitting(true);
+    try {
+      const isDemo = await login({ id, password: pw });
+      const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? "/home";
+      navigate(isDemo ? "/onboarding" : from, { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "로그인에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // DEV-ONLY — see useAuth.ts's DEMO_LOGIN comment for how to remove this once real auth exists.
+  async function demoLogin() {
+    setError("");
+    setSubmitting(true);
+    try {
+      await loginDemo();
+      navigate("/onboarding", { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "데모 로그인에 실패했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -51,46 +80,29 @@ export default function LoginPage() {
               <label htmlFor="gn-id" style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "6px" }}>
                 아이디
               </label>
-              <input
+              <TextField
                 id="gn-id"
-                className="gn-input"
                 value={id}
                 onChange={(e) => setId(e.target.value)}
                 placeholder="아이디를 입력하세요"
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "12px 16px",
-                  border: "1px solid #E5E8E7",
-                  borderRadius: "12px",
-                  fontSize: "14px",
-                }}
               />
             </div>
             <div>
               <label htmlFor="gn-pw" style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "6px" }}>
                 비밀번호
               </label>
-              <input
+              <TextField
                 id="gn-pw"
                 type="password"
-                className="gn-input"
                 value={pw}
                 onChange={(e) => setPw(e.target.value)}
                 placeholder="비밀번호를 입력하세요"
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "12px 16px",
-                  border: "1px solid #E5E8E7",
-                  borderRadius: "12px",
-                  fontSize: "14px",
-                }}
               />
             </div>
             {error && <p style={{ fontSize: "14px", color: "#EF4444", margin: 0 }}>{error}</p>}
             <button
               onClick={submit}
+              disabled={submitting}
               className="hover-primary"
               style={{
                 width: "100%",
@@ -101,7 +113,8 @@ export default function LoginPage() {
                 borderRadius: "12px",
                 fontSize: "14px",
                 fontWeight: 600,
-                cursor: "pointer",
+                cursor: submitting ? "default" : "pointer",
+                opacity: submitting ? 0.7 : 1,
               }}
             >
               로그인
@@ -152,6 +165,28 @@ export default function LoginPage() {
             </button>
           </div>
         </div>
+        {import.meta.env.DEV && (
+          <button
+            onClick={demoLogin}
+            disabled={submitting}
+            className="hover-outline"
+            style={{
+              width: "100%",
+              marginTop: "16px",
+              padding: "12px",
+              background: "#fff",
+              color: "#0B7A4D",
+              border: "1px solid #10B45F",
+              borderRadius: "12px",
+              fontSize: "13px",
+              fontWeight: 600,
+              cursor: submitting ? "default" : "pointer",
+              opacity: submitting ? 0.7 : 1,
+            }}
+          >
+            데모 계정으로 시작하기
+          </button>
+        )}
         <p style={{ textAlign: "center", fontSize: "12px", color: "#747C78", margin: "20px 0 0" }}>
           로그인하면 공농 서비스를 이용할 수 있습니다
         </p>

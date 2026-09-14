@@ -3,7 +3,6 @@ import Hero from "./landing/Hero";
 import AboutStats from "./landing/AboutStats";
 import Features from "./landing/Features";
 import HowItWorks from "./landing/HowItWorks";
-import Demo from "./landing/Demo";
 import Faq from "./landing/Faq";
 import CtaBanner from "./landing/CtaBanner";
 import Footer from "./landing/Footer";
@@ -16,7 +15,6 @@ export default function LandingPage() {
       <AboutStats />
       <Features />
       <HowItWorks />
-      <Demo />
       <Faq />
       <CtaBanner />
       <Footer />

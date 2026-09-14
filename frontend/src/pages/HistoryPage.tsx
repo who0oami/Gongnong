@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useApp, useEasyMode } from "../state/AppContext";
 import { useModal } from "../state/ModalContext";
-import { thumbOf } from "../constants";
+import { thumbOf } from "../utils/video";
 import { tabStyle } from "../styles";
+import EmptyState from "../components/common/EmptyState";
 import type { HistoryStatus } from "../types";
-import type { NewGroupArg } from "../components/modals/NewGroupModal";
+import { ICON } from "../constants";
+import type { NewGroupArg } from "../components/feature/modals/NewGroupModal";
 
 const badgeStyle = (status: HistoryStatus) => ({
   flexShrink: 0,
@@ -22,15 +24,18 @@ export default function HistoryPage() {
   const { history, groups, setCurrentUrl, removeGroup, removeItemFromGroup, requestDelete } = useApp();
   const { openModal } = useModal();
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialTab = (location.state as { tab?: string } | null)?.tab ?? "all";
 
-  const [tab, setTab] = useState<string>("all");
+  const [tab, setTab] = useState<string>(initialTab);
   const [checked, setChecked] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<string[]>(() => groups.map((g) => g.id));
 
-  const viewingGroupObj = tab === "all" ? null : groups.find((g) => g.id === tab) ?? null;
+  const viewingGroupObj = (tab === "all" || tab === "groups") ? null : groups.find((g) => g.id === tab) ?? null;
   const items = tab === "all" ? history : history.filter((h) => viewingGroupObj?.itemIds.includes(h.id));
-  const groupEmpty = items.length === 0 && tab !== "all";
-  const showGroupList = tab === "all" && groups.length > 0;
+  const groupEmpty = items.length === 0 && tab !== "all" && tab !== "groups";
+  const showGroupList = (tab === "all" || tab === "groups") && groups.length > 0;
+  const showGroupsTab = tab === "groups";
 
   function play(url: string) {
     setCurrentUrl(url);
@@ -87,10 +92,13 @@ export default function HistoryPage() {
         <button onClick={() => setTab("all")} style={tabStyle(tab === "all")}>
           전체
         </button>
+        <button onClick={() => setTab("groups")} style={tabStyle(tab === "groups")}>
+          저장한 영상
+        </button>
         {groups.map((g) => (
           <button key={g.id} onClick={() => setTab(g.id)} style={tabStyle(tab === g.id)}>
             <svg viewBox="0 0 24 24" style={{ width: "12px", height: "12px", fill: "currentColor" }}>
-              <path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z" />
+              <path d={ICON.folder} />
             </svg>
             {g.name}
             <span style={{ opacity: 0.6 }}>({g.itemIds.length})</span>
@@ -112,7 +120,7 @@ export default function HistoryPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", padding: "0 4px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <svg viewBox="0 0 24 24" style={{ width: "16px", height: "16px", fill: "#10B45F" }}>
-              <path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z" />
+              <path d={ICON.folder} />
             </svg>
             <span style={{ fontSize: "14px", fontWeight: 700 }}>{viewingGroupObj.name}</span>
           </div>
@@ -122,7 +130,7 @@ export default function HistoryPage() {
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+      <div style={{ display: showGroupsTab ? "none" : "flex", flexDirection: "column", gap: "12px" }}>
         {items.map((h) => {
           const isChecked = checked.includes(h.id);
           const done = h.status === "완료";
@@ -134,6 +142,9 @@ export default function HistoryPage() {
             >
               <button
                 onClick={() => toggleCheck(h.id)}
+                role="checkbox"
+                aria-checked={isChecked}
+                aria-label={`${h.title} 선택`}
                 style={{
                   flexShrink: 0,
                   alignSelf: "flex-start",
@@ -151,7 +162,7 @@ export default function HistoryPage() {
                 }}
               >
                 <svg viewBox="0 0 24 24" style={{ width: "12px", height: "12px", fill: "#fff", opacity: isChecked ? 1 : 0 }}>
-                  <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                  <path d={ICON.check} />
                 </svg>
               </button>
               <div
@@ -198,7 +209,7 @@ export default function HistoryPage() {
                     style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "#747C78", background: "none", border: "none", padding: "8px 6px", cursor: "pointer", whiteSpace: "nowrap" }}
                   >
                     <svg viewBox="0 0 24 24" style={{ width: "14px", height: "14px", fill: "currentColor" }}>
-                      <path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z" />
+                      <path d={ICON.folder} />
                     </svg>
                     그룹에 추가
                   </button>
@@ -214,12 +225,20 @@ export default function HistoryPage() {
             </div>
           );
         })}
-        {groupEmpty && <div style={{ textAlign: "center", padding: "40px 0", fontSize: "14px", color: "#747C78" }}>이 그룹에 영상이 없습니다</div>}
+        {groupEmpty && <EmptyState padding="40px 0" color="#747C78" title="이 그룹에 영상이 없습니다" />}
       </div>
 
       {showGroupList && (
-        <div style={{ marginTop: "32px" }}>
-          <h2 style={{ fontSize: "14px", fontWeight: 700, margin: "0 0 12px" }}>내 그룹</h2>
+        <div style={{ marginTop: showGroupsTab ? "0" : "32px" }}>
+          {!showGroupsTab && <h2 style={{ fontSize: "14px", fontWeight: 700, margin: "0 0 12px" }}>내 그룹</h2>}
+          {showGroupsTab && groups.length === 0 && (
+            <EmptyState
+              padding="60px 0"
+              color="#B0B8B4"
+              title="저장한 그룹이 없어요"
+              description="시청 기록에서 영상을 그룹에 추가해보세요"
+            />
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {groups.map((g) => {
               const gitems = history.filter((h) => g.itemIds.includes(h.id));
@@ -228,11 +247,12 @@ export default function HistoryPage() {
                 <div key={g.id} style={{ background: "#fff", border: "1px solid #E5E8E7", borderRadius: "16px", overflow: "hidden" }}>
                   <button
                     onClick={() => toggleExpand(g.id)}
+                    aria-expanded={isExpanded}
                     className="hover-muted"
                     style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", background: "none", border: "none", cursor: "pointer" }}
                   >
                     <svg viewBox="0 0 24 24" style={{ width: "16px", height: "16px", fill: "#10B45F", flexShrink: 0 }}>
-                      <path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z" />
+                      <path d={ICON.folder} />
                     </svg>
                     <span style={{ flex: 1, fontSize: "14px", fontWeight: 600, textAlign: "left" }}>{g.name}</span>
                     <span style={{ fontSize: "12px", color: "#747C78" }}>{g.itemIds.length}개</span>

@@ -34,76 +34,13 @@ export default function AboutStats() {
     <section
       id="about"
       style={{
-        position: "relative",
-        overflow: "hidden",
-        background: "linear-gradient(160deg, #F6FBF8 0%, #EDF8F1 55%, #E4F4EA 100%)",
+        background: "#F6FBF8",
         borderTop: "1px solid #DDF5E8",
         borderBottom: "1px solid #DDF5E8",
         padding: "72px 24px",
         scrollMarginTop: "64px",
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          top: "-180px",
-          right: "-120px",
-          width: "480px",
-          height: "480px",
-          borderRadius: "999px",
-          background: "radial-gradient(circle at 30% 30%, rgba(141,222,152,.28), rgba(141,222,152,.06) 70%, transparent 100%)",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          top: "120px",
-          right: "180px",
-          width: "300px",
-          height: "300px",
-          borderRadius: "999px",
-          background: "radial-gradient(circle at 40% 40%, rgba(16,180,95,.10), transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          width: "560px",
-          height: "560px",
-          borderRadius: "999px",
-          background: "radial-gradient(circle at 50% 40%, rgba(97,207,130,.20), rgba(97,207,130,.04) 70%, transparent 100%)",
-          pointerEvents: "none",
-          left: "-141px",
-          top: "175px",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          bottom: "90px",
-          right: "300px",
-          width: "22px",
-          height: "22px",
-          borderRadius: "999px",
-          background: "rgba(141,222,152,.35)",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          top: "45%",
-          right: "90px",
-          width: "54px",
-          height: "54px",
-          borderRadius: "999px",
-          background: "rgba(141,222,152,.30)",
-          pointerEvents: "none",
-        }}
-      />
-
       <div
         style={{
           maxWidth: "1024px",

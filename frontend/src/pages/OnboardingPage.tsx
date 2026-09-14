@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
+import TransparentImg from "../components/common/TransparentImg";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../state/AppContext";
-import { AGE_OPTIONS, PREF_OPTIONS, TOPIC_OPTIONS } from "../constants";
+import { AGE_OPTIONS, ICON, PREF_OPTIONS, TOPIC_OPTIONS } from "../constants";
 import { obChipStyle, obMark, obRowStyle } from "../styles";
 import logo from "../assets/logo.png";
 import obEasyArt from "../assets/ob-easy-art.png";
 import obStdArt from "../assets/ob-std-art.png";
 import gnDone from "../assets/gn-done.png";
 
-const CHECK_PATH = "M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z";
+const CHECK_PATH = ICON.check;
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
@@ -235,7 +236,7 @@ export default function OnboardingPage() {
                   display: "flex",
                   flexDirection: "column",
                   minHeight: "290px",
-                  background: "#F4FCF8",
+                  background: "#fff",
                   borderRadius: "20px",
                   border: onboarding.view === "easy" ? "2px solid #10B45F" : "1px solid #E4F2EA",
                 }}
@@ -247,7 +248,7 @@ export default function OnboardingPage() {
                     <br />
                     간단하게 이용할 수 있어요.
                   </p>
-                  <img src={obEasyArt} alt="" style={{ width: "128px", height: "auto", display: "block", alignSelf: "flex-end", margin: "8px 0 -18px" }} />
+                  <TransparentImg src={obEasyArt} style={{ width: "128px", height: "auto", display: "block", alignSelf: "flex-end", margin: "8px 0 -18px" }} />
                 </div>
                 <div style={{ padding: "18px" }}>
                   <button
@@ -350,7 +351,7 @@ export default function OnboardingPage() {
             >
               공농 시작하기{" "}
               <svg viewBox="0 0 24 24" style={{ width: "16px", height: "16px", fill: "currentColor" }}>
-                <path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                <path d={ICON.chevronRight} />
               </svg>
             </button>
           </div>

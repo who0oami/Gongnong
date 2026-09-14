@@ -1,18 +1,18 @@
-import { BULLETS } from "../../constants";
+import { BULLETS, ICON } from "../../constants";
 import signAvatar from "../../assets/sign-avatar.png";
 
-const CHECK_PATH = "M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z";
+const CHECK_PATH = ICON.check;
 
 export default function Demo() {
   return (
     <section style={{ padding: "64px 24px", background: "#F7F8F8" }}>
       <div
         style={{
-          maxWidth: "1024px",
+          maxWidth: "1160px",
           margin: "0 auto",
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-          gap: "40px",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gap: "48px",
           alignItems: "center",
         }}
       >
@@ -52,7 +52,7 @@ export default function Demo() {
           </ul>
         </div>
 
-        <div style={{ background: "#fff", border: "1px solid #E5E8E7", borderRadius: "16px", overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}>
+        <div style={{ background: "#fff", borderRadius: "20px", overflow: "hidden", boxShadow: "0 2px 16px rgba(0,0,0,.07)" }}>
           <div
             style={{
               position: "relative",
@@ -141,7 +141,7 @@ export default function Demo() {
                 </span>
                 <span style={{ width: "28px", height: "28px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <svg viewBox="0 0 24 24" style={{ width: "14px", height: "14px", fill: "#747C78" }}>
-                    <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    <path d={ICON.close} />
                   </svg>
                 </span>
                 <span style={{ width: "28px", height: "28px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
