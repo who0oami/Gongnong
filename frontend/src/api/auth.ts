@@ -24,6 +24,9 @@ export interface AuthResponse {
 // - login/signup identifier field: `id` vs `username`/`email`
 // - AuthResponse envelope: bare {user, accessToken} vs wrapped (see types/api.ts ApiResponse<T>)
 // - token field name/type: accessToken vs token, and whether a refreshToken is issued
+// - session model: docs/api-field-requirements.md flags cookie-session vs JWT as still undecided,
+//   and proposes an `expiresAt` on the session — if adopted, useAuth()/tokenStorage.ts would need
+//   to start checking expiry instead of trusting the stored token indefinitely
 export const authApi = {
   login: (payload: LoginRequest) => apiClient.post<AuthResponse>("/auth/login", payload),
   signup: (payload: SignupRequest) => apiClient.post<AuthResponse>("/auth/signup", payload),

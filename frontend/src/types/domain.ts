@@ -1,5 +1,10 @@
 export type HistoryStatus = "완료" | "실패" | "처리중";
 
+// TODO (see docs/api-field-requirements.md): backend field names likely job_id/thumbnail_url/
+// processed_at rather than id/url/date — confirm mapping when the real historyApi lands. Also
+// unconfirmed: whether the backend models item→group as a single `group_id` on the item (null =
+// 미분류) or, like our current Group.itemIds below, a group holding many item ids — these are not
+// the same shape and one side will need to change once the API is confirmed.
 export interface HistoryItem {
   id: string;
   title: string;
@@ -13,6 +18,8 @@ export interface HistoryItem {
   subtitleUrl?: string;
 }
 
+// TODO: backend also tracks group_name/user_id/created_at and hasn't decided whether deleting a
+// group soft-deletes it (keeping its items' history) — see docs/api-field-requirements.md.
 export interface Group {
   id: string;
   name: string;
@@ -25,6 +32,9 @@ export interface Settings {
   defaultSpeed: string;
 }
 
+// TODO: if the backend persists this (docs/api-field-requirements.md proposes a `screen_mode`
+// column, enum "쉬운 화면"/"기본 화면"), decide whether to store that Korean enum as-is or keep
+// mapping to/from these English values here.
 export type ScreenView = "" | "easy" | "standard";
 
 export interface OnboardingSelections {
