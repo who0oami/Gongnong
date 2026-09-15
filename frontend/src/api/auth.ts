@@ -23,10 +23,9 @@ export interface AuthResponse {
 // - endpoint paths themselves (/auth/*)
 // - login/signup identifier field: `id` vs `username`/`email`
 // - AuthResponse envelope: bare {user, accessToken} vs wrapped (see types/api.ts ApiResponse<T>)
-// - token field name/type: accessToken vs token, and whether a refreshToken is issued
-// - session model: docs/api-field-requirements.md flags cookie-session vs JWT as still undecided,
-//   and proposes an `expiresAt` on the session — if adopted, useAuth()/tokenStorage.ts would need
-//   to start checking expiry instead of trusting the stored token indefinitely
+//
+// 백엔드 확정: 세션은 JWT 방식, access_token만 발급 (MVP에서는 refreshToken 생략). AuthResponse의
+// accessToken이 이 JWT access_token에 해당하며, 만료 시 별도 갱신 없이 재로그인이 필요하다.
 export const authApi = {
   login: (payload: LoginRequest) => apiClient.post<AuthResponse>("/auth/login", payload),
   signup: (payload: SignupRequest) => apiClient.post<AuthResponse>("/auth/signup", payload),
