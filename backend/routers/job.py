@@ -1,5 +1,8 @@
 import asyncio
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from database import get_db
 from schemas.youtube import YoutubeRequest
 from schemas.job import Job, JobStatus, JobResult, JobSegment
 from services import job_repository
@@ -46,8 +49,35 @@ async def process_job(job_id: str, url: str) -> None:
 
 
 @router.post("/translate/jobs", response_model=Job, status_code=202)
-async def create_translation_job(request: YoutubeRequest, background_tasks: BackgroundTasks):
-    job = job_repository.create_job(url=request.url)
+async def create_translation_job(
+    request: YoutubeRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    video_id = extract_video_id(request.url)
+
+    if video_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="URL에서 영상 ID를 찾을 수 없습니다.",
+        )
+
+    video = job_repository.get_or_create_video_db(
+        db,
+        source_url=request.url,
+        youtube_video_id=video_id,
+    )
+    translation_job = job_repository.create_translation_job_db(
+        db,
+        video_id=video.id,
+    )
+
+    job = Job(
+        job_id=str(translation_job.public_id),
+        status=JobStatus(translation_job.status),
+        url=request.url,
+    )
+
     background_tasks.add_task(process_job, job.job_id, request.url)
 
     return job
