@@ -71,6 +71,28 @@ python extractor/build_hand_shape_prior.py --dataset "<3D 데이터셋 폴더>" 
 다시 시도할 땐 새 파일명을 쓰세요. 정확한 옵션, 각 단계가 정확히 뭘 하는지는
 `CLAUDE.md`의 "Architecture: the pipeline, stage by stage"에 더 자세히 있습니다.
 
+## 결과 보는 법
+
+위 4)/5) 단계로 만든 `output/*.blend`는 두 가지 방법으로 확인할 수 있습니다.
+
+**A. Blender에서 직접 열기**
+```powershell
+& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" output/<id>_v1.blend
+```
+3D 뷰포트에 마우스를 올려두고 Space bar를 누르면 애니메이션이 재생됩니다. 타임라인의
+`REVIEW_L/R/LR` 마커는 검출/좌우 판별을 다시 확인해야 하는 구간, `OBSERVED_L_R`는 두
+손 관측이 실제로 적용된 구간이라는 뜻입니다(수어 정확도 보증은 아닙니다).
+
+**B. Blender 없이 브라우저에서 미리보기**
+```powershell
+scripts\run_mediapipe_preview.cmd
+```
+이 워크스페이스를 로컬 서버로 띄우고 `mediapipe-preview/index.html`을 자동으로 엽니다.
+상단에서 원본 영상과 `keypoints/*.json`을 골라, 같은 화면에서 원본 영상과 GLB/VRM
+아바타 리타게팅을 나란히 재생/탐색할 수 있습니다(1~4단계만 반영, 5단계 KNN 보정은
+Blender `.blend` 쪽에만 적용됩니다). 최초 로딩 시 Babylon.js CDN 때문에 인터넷 연결이
+필요합니다.
+
 ## 더 볼 곳
 
 - `extractor/README_hand_shape_prior.md` — KNN 통계 보정 상세 (무엇을, 왜, 어떻게)
