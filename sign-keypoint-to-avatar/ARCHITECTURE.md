@@ -1,6 +1,8 @@
-# CLAUDE.md
+# Architecture
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Reference doc for this pipeline's structure, script-by-script. Also read by
+Claude Code (claude.ai/code) as project context when working in this
+repository.
 
 ## What this directory is
 

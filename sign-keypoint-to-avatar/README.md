@@ -8,7 +8,7 @@
 텍스트→글로스(gloss) 모델 작업은 `ai/text-to-gloss/`로 분리되어 있으며 이 폴더와는
 별개 파이프라인입니다.
 
-전체 아키텍처, 각 스크립트 옵션, 지켜야 할 규칙은 `CLAUDE.md`에 정리되어 있습니다.
+전체 아키텍처, 각 스크립트 옵션, 지켜야 할 규칙은 `ARCHITECTURE.md`에 정리되어 있습니다.
 
 ## 폴더 구조
 
@@ -25,7 +25,7 @@ sign-keypoint-to-avatar/
 ├─ diagnostics/          검증용 렌더 이미지, 감사(audit) 리포트 — git 미포함
 ├─ sample/               레거시 WORD2153 테스트용 고정 3D 데이터
 ├─ retarget_config.json / retarget_profile.json   레거시 WORD2153 경로 설정
-├─ CLAUDE.md             전체 아키텍처와 명령어 레퍼런스
+├─ ARCHITECTURE.md      전체 아키텍처와 명령어 레퍼런스
 └─ HAND_DENOISER_ML_EXPERIMENTS.md   손 모션 보정 실험 기록(성공/실패 모두)
 ```
 
@@ -65,7 +65,7 @@ python extractor/build_hand_shape_prior.py --dataset "<3D 데이터셋 폴더>" 
 
 각 단계는 출력 파일명이 이미 있으면 실행을 거부하도록 되어 있어 기존 결과를 덮어쓰지
 않습니다. 재시도할 때는 새 파일명을 사용하면 됩니다. 각 단계가 정확히 하는 일은
-`CLAUDE.md`의 "Architecture: the pipeline, stage by stage"에서 확인할 수 있습니다.
+`ARCHITECTURE.md`의 "Architecture: the pipeline, stage by stage"에서 확인할 수 있습니다.
 
 ## 결과 확인 (팀원 테스트용)
 
