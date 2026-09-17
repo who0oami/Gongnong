@@ -1,6 +1,13 @@
 # ksl-tube
 Description AI-powered Korean Sign Language translation for YouTube videos
 
+## 📂 프로젝트 구성
+
+- `backend/` — YouTube 자막 `/translate` API
+- `frontend/` — OpenPose 키포인트 데모
+- `sign-keypoint-to-avatar/` — 수어 영상 → 키포인트 추출 → VRM 아바타 리타게팅 파이프라인 ([README](sign-keypoint-to-avatar/README.md))
+- `ai/text-to-gloss/` — 텍스트 → 글로스(gloss) 변환 모델
+
 ---
 
 ## 🤝 GitHub 협업 규칙
