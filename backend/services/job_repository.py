@@ -71,6 +71,28 @@ def get_translation_job_db(
     return db.execute(statement).scalar_one_or_none()
 
 
+def get_translation_job_with_video_db(
+    db: Session,
+    job_id: str,
+) -> tuple[TranslationJob, Video] | None:
+    try:
+        public_id = uuid.UUID(job_id)
+    except (ValueError, AttributeError):
+        return None
+
+    statement = (
+        select(TranslationJob, Video)
+        .join(Video, TranslationJob.video_id == Video.id)
+        .where(TranslationJob.public_id == public_id)
+    )
+    row = db.execute(statement).one_or_none()
+
+    if row is None:
+        return None
+
+    return row[0], row[1]
+
+
 def update_translation_job_db(
     db: Session,
     job_id: str,
