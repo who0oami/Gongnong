@@ -1,0 +1,10 @@
+{
+  "name": "Model_M3_MediaPipe_arms_v1",
+  "model": "assets/Model_M3.glb",
+  "axis": [1, -1, -1],
+  "min_visibility": 0.5,
+  "sides": {
+    "L": {"pose": [11, 13, 15], "hand": "left_hand", "bones": ["J_Bip_L_UpperArm", "J_Bip_L_LowerArm", "J_Bip_L_Hand", "J_Bip_L_Middle1"]},
+    "R": {"pose": [12, 14, 16], "hand": "right_hand", "bones": ["J_Bip_R_UpperArm", "J_Bip_R_LowerArm", "J_Bip_R_Hand", "J_Bip_R_Middle1"]}
+  }
+}
