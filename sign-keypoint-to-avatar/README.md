@@ -55,8 +55,8 @@ python scripts/prepare_stable_hands.py --base keypoints/<id>.json --refined keyp
 # 3) 프레임 간 떨림 제거 (One-Euro filter)
 python extractor/smooth_hand_landmarks.py --input keypoints/<id>_stable.json --output keypoints/<id>_stable_smoothed.json
 
-# 4) Blender로 아바타에 리타게팅
-& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" --background --factory-startup --python-exit-code 1 --python scripts/mediapipe_to_blender_aligned.py -- --motion keypoints/<id>_stable_smoothed.json --profile mediapipe-preview/blender_M10_profile_fist_v1.json --output output/<id>_v1.blend --render
+# 4) Blender로 아바타에 리타게팅 (기본은 F10 여자 모델, 남자 모델은 blender_M10_profile_fist_v1.json)
+& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" --background --factory-startup --python-exit-code 1 --python scripts/mediapipe_to_blender_aligned.py -- --motion keypoints/<id>_stable_smoothed.json --profile mediapipe-preview/blender_F10_profile_v1.json --output output/<id>_v1.blend --render
 
 # 5) (선택) 이상치 손 모양을 1500단어 데이터로 통계 보정
 python extractor/build_hand_shape_prior.py --dataset "<3D 데이터셋 폴더>" --output extractor/hand_shape_prior.npz
@@ -74,9 +74,11 @@ python scripts/run_full_pipeline.py "<영상 경로>.mp4" --sign-id <id> --label
 ```
 
 `output/<id>_hands_<실행시각>/` 폴더를 새로 만들고 그 안에 중간 결과(raw/refined/stable/
-smoothed json)와 최종 `.blend`를 저장합니다. `extractor/hand_shape_prior.npz`가 이미
-있으면 5단계(KNN 보정)까지 자동으로 이어서 실행하고, 없으면 4단계 결과만 만들고 5단계는
-건너뜁니다. `--skip-prior-correction`으로 5단계를 강제로 끌 수 있고, `--profile`/
+smoothed json)와 최종 `.blend`를 저장합니다. 기본 아바타는 F10(여자) 모델이고, 남자
+모델(M10)로 돌리려면 `--profile mediapipe-preview/blender_M10_profile_fist_v1.json`을
+넘기면 됩니다. `extractor/hand_shape_prior.npz`가 이미 있으면 5단계(KNN 보정)까지
+자동으로 이어서 실행하고, 없으면 4단계 결과만 만들고 5단계는 건너뜁니다.
+`--skip-prior-correction`으로 5단계를 강제로 끌 수 있고, `--profile`/
 `--blender`/`--prior`로 각각 다른 값을 줄 수 있습니다.
 
 ## 결과 확인 (팀원 테스트용)

@@ -26,7 +26,7 @@ def main():
     p.add_argument('video', type=Path)
     p.add_argument('--sign-id', required=True)
     p.add_argument('--label', default='')
-    p.add_argument('--profile', type=Path, default=ROOT / 'mediapipe-preview/blender_M10_profile_fist_v1.json')
+    p.add_argument('--profile', type=Path, default=ROOT / 'mediapipe-preview/blender_F10_profile_v1.json')
     p.add_argument('--blender', type=Path, default=Path('C:/Program Files/Blender Foundation/Blender 5.2/blender.exe'))
     p.add_argument('--prior', type=Path, default=ROOT / 'extractor/hand_shape_prior.npz')
     p.add_argument('--skip-prior-correction', action='store_true',
