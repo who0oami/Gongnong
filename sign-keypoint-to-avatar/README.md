@@ -67,6 +67,18 @@ python extractor/build_hand_shape_prior.py --dataset "<3D 데이터셋 폴더>" 
 않습니다. 재시도할 때는 새 파일명을 사용하면 됩니다. 각 단계가 정확히 하는 일은
 `ARCHITECTURE.md`의 "Architecture: the pipeline, stage by stage"에서 확인할 수 있습니다.
 
+위 1)~5)를 한 번에 실행하는 스크립트도 있습니다.
+
+```powershell
+python scripts/run_full_pipeline.py "<영상 경로>.mp4" --sign-id <id> --label <라벨>
+```
+
+`output/<id>_hands_<실행시각>/` 폴더를 새로 만들고 그 안에 중간 결과(raw/refined/stable/
+smoothed json)와 최종 `.blend`를 저장합니다. `extractor/hand_shape_prior.npz`가 이미
+있으면 5단계(KNN 보정)까지 자동으로 이어서 실행하고, 없으면 4단계 결과만 만들고 5단계는
+건너뜁니다. `--skip-prior-correction`으로 5단계를 강제로 끌 수 있고, `--profile`/
+`--blender`/`--prior`로 각각 다른 값을 줄 수 있습니다.
+
 ## 결과 확인 (팀원 테스트용)
 
 위 4)/5) 단계 결과물은 아래 두 가지 방법으로 확인하면 됩니다.
