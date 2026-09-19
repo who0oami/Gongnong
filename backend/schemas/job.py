@@ -17,6 +17,7 @@ class JobSegment(BaseModel):
     start: float
     end: float
     source_text: str
+    corrected_text: Optional[str] = None
     ksl_text: Optional[str] = None
 
 

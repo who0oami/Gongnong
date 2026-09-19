@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel, field_validator
 
 
@@ -20,9 +21,17 @@ class Segment(BaseModel):
     start: float
     end: float
     text: str
+    corrected_text: Optional[str] = None
 
 
 class YoutubeResponse(BaseModel):
     received_url: str
+    transcript: str
+    segments: list[Segment]
+
+
+class SubtitleCorrectionResponse(BaseModel):
+    title: str
+    description: str
     transcript: str
     segments: list[Segment]

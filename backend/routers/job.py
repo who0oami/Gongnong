@@ -5,7 +5,8 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from schemas.youtube import YoutubeRequest
 from schemas.job import Job, JobStatus, JobResult, JobSegment
 from services import job_repository
-from services.youtube_service import extract_video_id, get_transcript_data
+from services.youtube_service import extract_video_id
+from services.subtitle_pipeline_service import get_corrected_transcript_data
 from services.demo_gloss_override import DEMO_GLOSS_OVERRIDE, build_display_sequence_from_codes
 from services.llm_gloss_service import convert_to_gloss, GlossConversionError
 from services.clip_resolver import resolve_clip_path, VIDEOS_DIR
@@ -50,7 +51,7 @@ async def process_job(job_id: str, url: str) -> None:
     job_repository.update_job(job_id, status=JobStatus.TRANSCRIPTING)
 
     try:
-        full_text, raw_segments = await asyncio.to_thread(get_transcript_data, video_id)
+        transcript_data = await asyncio.to_thread(get_corrected_transcript_data, url)
     except ValueError as e:
         job_repository.update_job(
             job_id,
@@ -61,8 +62,15 @@ async def process_job(job_id: str, url: str) -> None:
         )
         return
 
+    full_text = transcript_data["transcript"]
+    raw_segments = transcript_data["segments"]
     segments = [
-        JobSegment(start=seg["start"], end=seg["end"], source_text=seg["text"])
+        JobSegment(
+            start=seg["start"],
+            end=seg["end"],
+            source_text=seg["text"],
+            corrected_text=seg.get("corrected_text"),
+        )
         for seg in raw_segments
     ]
 
@@ -84,7 +92,10 @@ async def process_job(job_id: str, url: str) -> None:
             continue
 
         try:
-            gloss_sequence = await asyncio.to_thread(convert_to_gloss, seg.source_text)
+            gloss_sequence = await asyncio.to_thread(
+                convert_to_gloss,
+                seg.corrected_text or seg.source_text,
+            )
         except GlossConversionError as e:
             job_repository.update_job(
                 job_id,

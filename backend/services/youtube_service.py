@@ -1,6 +1,8 @@
 import re
 import json
+import logging
 import requests
+from yt_dlp import YoutubeDL
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
     TranscriptsDisabled,
@@ -9,6 +11,7 @@ from youtube_transcript_api._errors import (
 )
 
 SPELLER_URL = "https://nara-speller.co.kr/old_speller/results"
+logger = logging.getLogger(__name__)
 
 
 def correct_spelling(text: str) -> str:
@@ -68,6 +71,33 @@ def extract_video_id(url: str) -> str | None:
     return None
 
 
+def get_video_metadata(url: str) -> dict[str, str]:
+    """영상 다운로드 없이 제목과 설명을 조회하며, 실패 시 빈 문자열을 반환한다."""
+    options = {
+        "skip_download": True,
+        "noplaylist": True,
+        "quiet": True,
+        "socket_timeout": 10,
+        "cachedir": False,
+    }
+
+    try:
+        with YoutubeDL(options) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        if info is None:
+            return {"title": "", "description": ""}
+
+        return {
+            "title": info.get("title") or "",
+            "description": info.get("description") or "",
+        }
+    except Exception as e:
+        # 메타데이터는 보조 정보이므로 조회 실패가 자막 처리를 중단하지 않게 한다.
+        logger.warning("YouTube 메타데이터 조회 실패: %s", e)
+        return {"title": "", "description": ""}
+
+
 def group_into_sentences(raw_entries: list) -> list[dict]:
     sentence_endings = (".", "?", "!")
     ending_words = ("요", "다", "죠", "네요", "가요", "까요", "습니다", "니다")
@@ -105,12 +135,11 @@ def group_into_sentences(raw_entries: list) -> list[dict]:
 
         if is_sentence_end or is_forced_break:
             joined = " ".join(buffer_texts)
-            corrected = correct_spelling(joined)
 
             segments.append({
                 "start": buffer_start,
                 "end": buffer_end,
-                "text": corrected,
+                "text": joined,
             })
 
             buffer_texts = []
@@ -119,12 +148,11 @@ def group_into_sentences(raw_entries: list) -> list[dict]:
 
     if buffer_texts:
         joined = " ".join(buffer_texts)
-        corrected = correct_spelling(joined)
 
         segments.append({
             "start": buffer_start,
             "end": buffer_end,
-            "text": corrected,
+            "text": joined,
         })
 
     return segments
