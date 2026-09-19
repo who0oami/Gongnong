@@ -1,0 +1,59 @@
+﻿{
+  "profile_name": "Model_M10_aligned_v1",
+  "hand_coordinates": "image_xy_aspect_corrected_with_image_relative_z",
+  "model_file": "C:/Users/ESTsoft/Downloads/Model_M10.vrm",
+  "anatomical_sides": {
+    "L": {
+      "group": "left_hand",
+      "pose": [
+        11,
+        13,
+        15
+      ]
+    },
+    "R": {
+      "group": "right_hand",
+      "pose": [
+        12,
+        14,
+        16
+      ]
+    }
+  },
+  "min_pose_visibility": 0.5,
+  "require_verified_hand_identity": true,
+  "max_hold_frames": 6,
+  "rotation_filter": {
+    "arm_degrees_per_frame": 12,
+    "hand_degrees_per_frame": 10,
+    "finger_degrees_per_frame": 12,
+    "response": 0.75,
+    "shape_median_radius": 2,
+    "landmark_smoothing_radius": 2
+  },
+  "wrist": {
+    "max_swing_degrees": 55,
+    "max_twist_degrees": 15
+  },
+  "forearm": {
+    "max_swing_degrees": 145,
+    "max_twist_degrees": 100
+  },
+  "thumb": {
+    "cmc_max_degrees": 55,
+    "mcp_max_degrees": 65,
+    "ip_max_degrees": 75
+  },
+  "finger_segment_ratio_min": 0.04,
+  "finger": {
+    "mcp_max_degrees": 90,
+    "pip_dip_max_degrees": 100,
+    "dip_max_degrees": 80,
+    "spread_max_degrees": 20,
+    "palmward_sign": {
+      "L": -1,
+      "R": 1
+    }
+  },
+  "input_mirrored": false
+}

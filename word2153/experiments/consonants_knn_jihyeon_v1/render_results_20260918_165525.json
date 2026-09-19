@@ -1,0 +1,74 @@
+﻿[
+  {
+    "word": "WORD3002",
+    "status": "complete"
+  },
+  {
+    "word": "WORD3003",
+    "status": "not_processed"
+  },
+  {
+    "word": "WORD3004",
+    "status": "complete"
+  },
+  {
+    "word": "WORD3005",
+    "status": "complete"
+  },
+  {
+    "word": "WORD3006",
+    "status": "complete"
+  },
+  {
+    "word": "WORD3007",
+    "status": "complete"
+  },
+  {
+    "word": "WORD3008",
+    "status": "complete"
+  },
+  {
+    "word": "WORD3009",
+    "status": "complete"
+  },
+  {
+    "word": "WORD3010",
+    "status": "complete"
+  },
+  {
+    "word": "WORD3011",
+    "status": "render_failed"
+  },
+  {
+    "word": "WORD3012",
+    "status": "render_failed"
+  },
+  {
+    "word": "WORD3013",
+    "status": "render_failed"
+  },
+  {
+    "word": "WORD3014",
+    "status": "render_failed"
+  },
+  {
+    "word": "WORD3015",
+    "status": "render_failed"
+  },
+  {
+    "word": "WORD3016",
+    "status": "render_failed"
+  },
+  {
+    "word": "WORD3017",
+    "status": "render_failed"
+  },
+  {
+    "word": "WORD3018",
+    "status": "render_failed"
+  },
+  {
+    "word": "WORD3019",
+    "status": "render_failed"
+  }
+]
