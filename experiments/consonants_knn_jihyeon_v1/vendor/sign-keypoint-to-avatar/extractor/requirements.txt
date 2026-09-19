@@ -1,0 +1,2 @@
+mediapipe==1.0.1
+# MediaPipe installs opencv-contrib-python, which provides cv2.

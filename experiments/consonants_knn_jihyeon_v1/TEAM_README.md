@@ -7,7 +7,7 @@
 ## 폴더 구조
 
 ```text
-word2153/
+ksl-tube/
 ├─ experiments/consonants_knn_jihyeon_v1/
 │  ├─ extract_all.py       영상 18개 → raw/refined/stable/smoothed JSON
 │  ├─ process_all.py       baseline/knn/knn+Jihyeon .blend 생성
@@ -27,7 +27,7 @@ word2153/
 
 ## 처리 대상
 
-`output/consonant_replacements`, `output/consonant_recordings`의 `WORD3002`~`WORD3019`입니다.
+`word2153/output/consonant_replacements`, `word2153/output/consonant_recordings`의 `WORD3002`~`WORD3019`입니다.
 
 ```text
 ㄴ ㄷ ㄹ ㅁ ㅂ ㅅ ㅇ ㅈ ㅊ ㅋ ㅌ ㅍ ㅎ ㄲ ㄸ ㅃ ㅆ ㅉ
@@ -46,7 +46,7 @@ word2153/
 
 ## 빠른 시작
 
-PowerShell에서 `word2153` 디렉터리 기준으로 실행합니다.
+PowerShell에서 저장소 루트(`ksl-tube`) 기준으로 실행합니다.
 
 ```powershell
 python experiments/consonants_knn_jihyeon_v1/extract_all.py

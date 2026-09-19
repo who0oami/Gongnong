@@ -8,7 +8,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parent
-sys.path.insert(0,str(ROOT.parents[1]/'.recording-deps'))
+sys.path.insert(0,str(ROOT.parents[1]/'word2153/.recording-deps'))
 import imageio_ffmpeg
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 BLENDER = 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe'

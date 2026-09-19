@@ -10,6 +10,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parent
 WORK = ROOT.parents[1]
+SOURCE_ROOT = WORK / 'word2153'
 VENDOR = ROOT / 'vendor/sign-keypoint-to-avatar'
 
 
@@ -41,7 +42,7 @@ def main():
     items = []
     for number in range(3002, 3020):
         word = f'WORD{number}'
-        directory = WORK/'output'/('consonant_replacements' if number < 3005 else 'consonant_recordings')
+        directory = SOURCE_ROOT/'output'/('consonant_replacements' if number < 3005 else 'consonant_recordings')
         metadata = json.loads((directory/f'{word}.json').read_text(encoding='utf-8'))
         video = directory/f'{word}.mp4'
         items.append({'word_id': word, 'letter': metadata['letter'], 'video': str(video), 'sha256': hashlib.sha256(video.read_bytes()).hexdigest()})

@@ -3,7 +3,7 @@
 이 브랜치는 기존 `word2153/` 파이프라인의 파일을 수정하지 않고 자음 실험만 별도 경로에 둡니다.
 
 ```text
-word2153/
+ksl-tube/
 ├─ experiments/consonants_knn_jihyeon_v1/
 │  ├─ extract_all.py          # 18개 원본 영상 → Holistic/손 crop/안정화 좌표
 │  ├─ process_clip.py         # baseline → KNN → Jihyeon 보완 → .blend

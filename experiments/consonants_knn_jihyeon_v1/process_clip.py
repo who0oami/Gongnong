@@ -175,7 +175,7 @@ def main():
             raise ValueError('KNN intermediate has no completion report')
         bpy.ops.wm.open_mainfile(filepath=str(knn))
     else:
-        script(VENDOR/'scripts/correct_hand_shape_prior.py', ['--input', baseline, '--output', knn, '--prior', ROOT.parents[1]/'extractor/hand_shape_prior.npz', '--report', folder/'knn_report.json'])
+    script(VENDOR/'scripts/correct_hand_shape_prior.py', ['--input', baseline, '--output', knn, '--prior', ROOT.parents[1]/'word2153/extractor/hand_shape_prior.npz', '--report', folder/'knn_report.json'])
     arm = primary_arm()
     metrics['knn'] = measurements(arm, absolute, rest, tail)
     scene = bpy.context.scene
