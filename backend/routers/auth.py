@@ -3,7 +3,7 @@ from jose import JWTError
 from sqlalchemy.orm import Session
 
 from database import get_db
-from schemas.auth import AuthResponse, LoginRequest, SignupRequest, UserOut
+from schemas.auth import AuthResponse, CompleteOnboardingRequest, LoginRequest, SignupRequest, UserOut
 from services import auth_service
 from models.user import User
 
@@ -67,3 +67,14 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)):
     return UserOut.model_validate(current_user)
+
+
+@router.patch("/me/onboarding", response_model=UserOut)
+def complete_onboarding(
+    payload: CompleteOnboardingRequest | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    screen_mode = payload.screen_mode if payload else None
+    user = auth_service.complete_onboarding_db(db, current_user, screen_mode=screen_mode)
+    return UserOut.model_validate(user)

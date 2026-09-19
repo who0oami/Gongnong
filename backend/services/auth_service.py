@@ -64,6 +64,16 @@ def get_user_by_id_db(db: Session, user_id: int) -> User | None:
     return db.get(User, user_id)
 
 
+def complete_onboarding_db(db: Session, user: User, screen_mode: str | None = None) -> User:
+    user.onboarding_completed = True
+    if screen_mode is not None:
+        user.screen_mode = screen_mode
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
 def create_user_db(
     db: Session, *, name: str, username: str, email: str, password: str
 ) -> User:
