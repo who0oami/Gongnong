@@ -238,6 +238,11 @@ data/datasets/
 *.mov
 *.mkv
 
+# ...except the frontend's own landing-page video assets (small, checked-in UI content,
+# not AI training data like the *.mp4 rule above is meant to exclude).
+!frontend/src/assets/*.mp4
+!frontend/src/imports/*.mp4
+
 # Compressed datasets
 *.zip
 *.tar
