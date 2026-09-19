@@ -75,6 +75,12 @@ def complete_onboarding(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    screen_mode = payload.screen_mode if payload else None
-    user = auth_service.complete_onboarding_db(db, current_user, screen_mode=screen_mode)
+    user = auth_service.complete_onboarding_db(
+        db,
+        current_user,
+        screen_mode=payload.screen_mode if payload else None,
+        age=payload.age if payload else None,
+        topics=payload.topics if payload else None,
+        prefs=payload.prefs if payload else None,
+    )
     return UserOut.model_validate(user)

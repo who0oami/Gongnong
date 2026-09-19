@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import json
 import os
 
 from jose import jwt
@@ -64,10 +65,23 @@ def get_user_by_id_db(db: Session, user_id: int) -> User | None:
     return db.get(User, user_id)
 
 
-def complete_onboarding_db(db: Session, user: User, screen_mode: str | None = None) -> User:
+def complete_onboarding_db(
+    db: Session,
+    user: User,
+    screen_mode: str | None = None,
+    age: str | None = None,
+    topics: list[str] | None = None,
+    prefs: list[str] | None = None,
+) -> User:
     user.onboarding_completed = True
     if screen_mode is not None:
         user.screen_mode = screen_mode
+    if age is not None:
+        user.age = age
+    if topics is not None:
+        user.topics = json.dumps(topics, ensure_ascii=False)
+    if prefs is not None:
+        user.prefs = json.dumps(prefs, ensure_ascii=False)
     db.commit()
     db.refresh(user)
 
