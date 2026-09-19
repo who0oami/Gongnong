@@ -19,10 +19,6 @@ from services.video_merger import merge_timeline_to_video, MISSING_CLIP_FALLBACK
 
 router = APIRouter()
 
-# ponytail: 이번 시연 목적상 고정 파일명 사용. 실제 서비스에서는 job_id 기반
-# 파일명으로 변경 필요 (동시에 여러 job이 돌면 서로 덮어씀).
-DEMO_OUTPUT_FILENAME = "presentation_demo.mp4"
-
 
 def _get_clip_duration(code: str) -> float:
     """video_merger.py의 __main__ 블록과 동일한 방식: 파일이 없으면 고정값,
@@ -49,6 +45,8 @@ async def process_job(job_id: str, url: str) -> None:
                 db,
                 job_id,
                 status=JobStatus.FAILED,
+                failed_stage="TRANSCRIPTING",
+                error_code="INVALID_URL",
                 error_message="URL에서 영상 ID를 찾을 수 없습니다.",
             )
             return
@@ -62,6 +60,8 @@ async def process_job(job_id: str, url: str) -> None:
                 db,
                 job_id,
                 status=JobStatus.FAILED,
+                failed_stage="TRANSCRIPTING",
+                error_code="TRANSCRIPT_ERROR",
                 error_message=str(e),
             )
             return
@@ -82,7 +82,6 @@ async def process_job(job_id: str, url: str) -> None:
         if translation_job is None:
             return
 
-        # TODO: Persist corrected_text after the DB migration.
         job_repository.create_transcript_segments_db(
             db,
             translation_job_id=translation_job.id,
@@ -116,6 +115,8 @@ async def process_job(job_id: str, url: str) -> None:
                     db,
                     job_id,
                     status=JobStatus.FAILED,
+                    failed_stage="KSL_CONVERTING",
+                    error_code="GLOSS_CONVERSION_ERROR",
                     error_message=str(e),
                 )
                 return
@@ -134,23 +135,29 @@ async def process_job(job_id: str, url: str) -> None:
 
         try:
             timeline = await asyncio.to_thread(build_timeline, timeline_segments, _get_clip_duration)
-            video_url = await asyncio.to_thread(merge_timeline_to_video, timeline, DEMO_OUTPUT_FILENAME)
+            video_url = await asyncio.to_thread(
+                merge_timeline_to_video,
+                timeline,
+                f"{job_id}.mp4",
+            )
         except Exception as e:
             job_repository.update_translation_job_db(
                 db,
                 job_id,
                 status=JobStatus.FAILED,
+                failed_stage="TIMELINE_BUILDING",
+                error_code="TIMELINE_BUILD_ERROR",
                 error_message=str(e),
             )
             return
 
         result = JobResult(transcript=full_text, segments=segments, video_url=video_url)
 
-        # TODO: Persist/restore result.video_url and failure details after schema expansion.
         job_repository.update_translation_job_db(
             db,
             job_id,
             status=JobStatus.COMPLETED,
+            result_video_url=video_url,
             completed_at=datetime.now(),
         )
     finally:
@@ -200,9 +207,35 @@ async def get_translation_job(job_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="존재하지 않는 job_id입니다.")
 
     translation_job, video = job_with_video
+    transcript_segments = job_repository.get_transcript_segments_db(
+        db,
+        translation_job.id,
+    )
+    segments = [
+        JobSegment(
+            start=segment.start_ms / 1000,
+            end=segment.end_ms / 1000,
+            source_text=segment.source_text,
+            corrected_text=segment.corrected_text,
+            ksl_text=segment.ksl_text,
+        )
+        for segment in transcript_segments
+    ]
+    status = JobStatus(translation_job.status)
+    result = None
+    if status == JobStatus.COMPLETED or translation_job.result_video_url:
+        result = JobResult(
+            transcript=" ".join(segment.source_text for segment in segments),
+            segments=segments,
+            video_url=translation_job.result_video_url,
+        )
+
     return Job(
         job_id=str(translation_job.public_id),
-        status=JobStatus(translation_job.status),
+        status=status,
         url=video.source_url,
+        result=result,
+        failed_stage=translation_job.failed_stage,
+        error_code=translation_job.error_code,
         error_message=translation_job.error_message,
     )

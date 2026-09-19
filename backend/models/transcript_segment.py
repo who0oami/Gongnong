@@ -19,5 +19,6 @@ class TranscriptSegment(Base):
     start_ms: Mapped[int] = mapped_column(Integer, nullable=False)
     end_ms: Mapped[int] = mapped_column(Integer, nullable=False)
     source_text: Mapped[str] = mapped_column(Text, nullable=False)
+    corrected_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     ksl_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidence: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)

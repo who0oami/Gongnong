@@ -23,6 +23,9 @@ class TranslationJob(Base):
     status: Mapped[str] = mapped_column(String(30), nullable=False)
     progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    failed_stage: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    result_video_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=False), server_default=func.now(), nullable=False
     )

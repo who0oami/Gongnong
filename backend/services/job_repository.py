@@ -101,6 +101,9 @@ def update_translation_job_db(
     progress: int | None = None,
     error_message: str | None = None,
     completed_at: datetime | None = None,
+    failed_stage: str | None = None,
+    error_code: str | None = None,
+    result_video_url: str | None = None,
 ) -> TranslationJob | None:
     translation_job = get_translation_job_db(db, job_id)
 
@@ -115,6 +118,12 @@ def update_translation_job_db(
         translation_job.error_message = error_message
     if completed_at is not None:
         translation_job.completed_at = completed_at
+    if failed_stage is not None:
+        translation_job.failed_stage = failed_stage
+    if error_code is not None:
+        translation_job.error_code = error_code
+    if result_video_url is not None:
+        translation_job.result_video_url = result_video_url
 
     db.commit()
     db.refresh(translation_job)
@@ -137,6 +146,7 @@ def create_transcript_segments_db(
             start_ms=round(segment.start * 1000),
             end_ms=round(segment.end * 1000),
             source_text=segment.source_text,
+            corrected_text=segment.corrected_text,
             ksl_text=segment.ksl_text,
             confidence=None,
         )
@@ -150,6 +160,19 @@ def create_transcript_segments_db(
         db.refresh(transcript_segment)
 
     return transcript_segments
+
+
+def get_transcript_segments_db(
+    db: Session,
+    translation_job_id: int,
+) -> list[TranscriptSegment]:
+    statement = (
+        select(TranscriptSegment)
+        .where(TranscriptSegment.translation_job_id == translation_job_id)
+        .order_by(TranscriptSegment.sequence_no.asc())
+    )
+
+    return list(db.execute(statement).scalars().all())
 
 
 def create_job(url: str) -> Job:
