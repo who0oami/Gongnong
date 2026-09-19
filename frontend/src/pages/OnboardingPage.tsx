@@ -75,7 +75,12 @@ export default function OnboardingPage() {
     }
     setFinishing(true);
     try {
-      await completeOnboarding(onboarding.view);
+      await completeOnboarding({
+        screenMode: onboarding.view,
+        age: onboarding.age,
+        topics: onboarding.topics,
+        prefs: onboarding.prefs,
+      });
       navigate("/home");
     } catch {
       setError("온보딩 완료 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");

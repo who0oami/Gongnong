@@ -11,4 +11,8 @@ export interface User {
   onboardingCompleted: boolean;
   // Backend's screen_mode (null until chosen) mapped to "" for the unset case — see ScreenView.
   screenMode: ScreenView;
+  // Backend's age (null until chosen) mapped to "" for the unset case.
+  age: string;
+  topics: string[];
+  prefs: string[];
 }

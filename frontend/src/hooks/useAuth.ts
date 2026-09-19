@@ -1,9 +1,9 @@
 import { useCallback } from "react";
-import { authApi, type LoginRequest, type SignupRequest } from "../api/auth";
+import { authApi, type CompleteOnboardingPayload, type LoginRequest, type SignupRequest } from "../api/auth";
 import { ApiError } from "../api/client";
 import { clearAuthToken, getAuthToken, setAuthToken } from "../api/tokenStorage";
 import { useUser } from "../state/UserContext";
-import type { ScreenView } from "../types";
+import type { User } from "../types";
 
 // "데모 계정으로 시작하기" button credentials — logs into a real backend account, creating it on
 // first use (see loginDemo below). Not a fake/local session; same account persists across visits.
@@ -13,8 +13,18 @@ const DEMO_SIGNUP = { name: "데모 사용자", id: "est", email: "est@demo.gong
 // The only place that should call authApi and touch tokenStorage — pages/components should go
 // through this hook instead of calling src/api/auth.ts directly, so token handling stays in one spot.
 export function useAuth() {
-  const { isAuthenticated, setAuthenticated, setProfile, setOnboardingCompleted, setSessionLoading, setScreenView } =
+  const { isAuthenticated, setAuthenticated, setProfile, setOnboardingCompleted, setSessionLoading, setOnboarding } =
     useUser();
+
+  // Backend-persisted onboarding selections (screen_mode/age/topics/prefs) all live on the User
+  // response — merge them into UserContext's onboarding state in one call, from every place that
+  // fetches or updates a User (login/signup/restoreSession/completeOnboarding below).
+  const syncOnboardingFromUser = useCallback(
+    (user: User) => {
+      setOnboarding({ view: user.screenMode, age: user.age, topics: user.topics, prefs: user.prefs });
+    },
+    [setOnboarding],
+  );
 
   const login = useCallback(
     async (payload: LoginRequest) => {
@@ -22,10 +32,10 @@ export function useAuth() {
       setAuthToken(res.accessToken);
       setProfile({ name: res.user.name, email: res.user.email });
       setOnboardingCompleted(res.user.onboardingCompleted);
-      setScreenView(res.user.screenMode);
+      syncOnboardingFromUser(res.user);
       setAuthenticated(true);
     },
-    [setAuthenticated, setProfile, setOnboardingCompleted, setScreenView],
+    [setAuthenticated, setProfile, setOnboardingCompleted, syncOnboardingFromUser],
   );
 
   const signup = useCallback(
@@ -34,10 +44,10 @@ export function useAuth() {
       setAuthToken(res.accessToken);
       setProfile({ name: res.user.name, email: res.user.email });
       setOnboardingCompleted(res.user.onboardingCompleted);
-      setScreenView(res.user.screenMode);
+      syncOnboardingFromUser(res.user);
       setAuthenticated(true);
     },
-    [setAuthenticated, setProfile, setOnboardingCompleted, setScreenView],
+    [setAuthenticated, setProfile, setOnboardingCompleted, syncOnboardingFromUser],
   );
 
   // Logs into the shared demo account, creating it the first time it's ever used (401 means it
@@ -71,7 +81,7 @@ export function useAuth() {
       const user = await authApi.me();
       setProfile({ name: user.name, email: user.email });
       setOnboardingCompleted(user.onboardingCompleted);
-      setScreenView(user.screenMode);
+      syncOnboardingFromUser(user);
       setAuthenticated(true);
     } catch {
       clearAuthToken();
@@ -79,19 +89,19 @@ export function useAuth() {
     } finally {
       setSessionLoading(false);
     }
-  }, [setAuthenticated, setProfile, setOnboardingCompleted, setSessionLoading, setScreenView]);
+  }, [setAuthenticated, setProfile, setOnboardingCompleted, setSessionLoading, syncOnboardingFromUser]);
 
-  // Called from OnboardingPage's final "공농 시작하기" step (with the screen mode chosen in step 4)
-  // and from MyPage when the user changes their screen mode later — persists both onto the backend
-  // so they survive a refresh/relogin. screenMode is optional: omit it to only flip
-  // onboarding_completed, same as before this API accepted a body.
+  // Called from OnboardingPage's final "공농 시작하기" step (with every selection made during
+  // onboarding) and from MyPage whenever the user changes one of these later — persists it onto the
+  // backend so it survives a refresh/relogin. Every field is optional: omit one to leave it
+  // unchanged server-side, same as before this API accepted a body.
   const completeOnboarding = useCallback(
-    async (screenMode?: ScreenView) => {
-      const user = await authApi.completeOnboarding(screenMode);
+    async (payload?: CompleteOnboardingPayload) => {
+      const user = await authApi.completeOnboarding(payload);
       setOnboardingCompleted(user.onboardingCompleted);
-      setScreenView(user.screenMode);
+      syncOnboardingFromUser(user);
     },
-    [setOnboardingCompleted, setScreenView],
+    [setOnboardingCompleted, syncOnboardingFromUser],
   );
 
   return { isAuthenticated, login, loginDemo, signup, logout, restoreSession, completeOnboarding };

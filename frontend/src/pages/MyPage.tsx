@@ -13,8 +13,7 @@ export default function MyPage() {
   const navigate = useNavigate();
   const { openModal } = useModal();
   const { logout, completeOnboarding } = useAuth();
-  const { profile, history, settings, setSettings, onboarding, setOnboarding, toggleOnboardingTopic, toggleOnboardingPref } =
-    useApp();
+  const { profile, history, settings, setSettings, onboarding } = useApp();
 
   const done = history.filter((h) => h.status === "완료");
   const totalWatch = done.reduce((a, h) => a + parseDur(h.duration), 0);
@@ -70,10 +69,10 @@ export default function MyPage() {
         <div style={{ padding: "14px 0", borderBottom: "1px solid #E5E8E7" }}>
           <p style={{ fontSize: "14px", fontWeight: 500, margin: "0 0 10px" }}>화면 모드</p>
           <div style={{ display: "flex", gap: "8px" }}>
-            <button onClick={() => void completeOnboarding("easy")} style={chip(onboarding.view === "easy")}>
+            <button onClick={() => void completeOnboarding({ screenMode: "easy" })} style={chip(onboarding.view === "easy")}>
               쉬운 화면
             </button>
-            <button onClick={() => void completeOnboarding("standard")} style={chip(onboarding.view === "standard")}>
+            <button onClick={() => void completeOnboarding({ screenMode: "standard" })} style={chip(onboarding.view === "standard")}>
               기본 화면
             </button>
           </div>
@@ -85,7 +84,7 @@ export default function MyPage() {
             {AGE_OPTIONS.map((label) => (
               <button
                 key={label}
-                onClick={() => setOnboarding({ age: onboarding.age === label ? "" : label })}
+                onClick={() => void completeOnboarding({ age: onboarding.age === label ? "" : label })}
                 style={chip(onboarding.age === label)}
               >
                 {label}
@@ -98,11 +97,15 @@ export default function MyPage() {
           <p style={{ fontSize: "14px", fontWeight: 500, margin: "0 0 4px" }}>관심 영상</p>
           <p style={{ fontSize: "12px", color: "#747C78", margin: "0 0 10px" }}>여러 개 선택할 수 있어요.</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-            {TOPIC_OPTIONS.map((label) => (
-              <button key={label} onClick={() => toggleOnboardingTopic(label)} style={chip(onboarding.topics.includes(label))}>
-                {label}
-              </button>
-            ))}
+            {TOPIC_OPTIONS.map((label) => {
+              const on = onboarding.topics.includes(label);
+              const nextTopics = on ? onboarding.topics.filter((t) => t !== label) : [...onboarding.topics, label];
+              return (
+                <button key={label} onClick={() => void completeOnboarding({ topics: nextTopics })} style={chip(on)}>
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -110,15 +113,19 @@ export default function MyPage() {
           <p style={{ fontSize: "14px", fontWeight: 500, margin: "0 0 4px" }}>시청 방식</p>
           <p style={{ fontSize: "12px", color: "#747C78", margin: "0 0 10px" }}>{prefHint}</p>
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {PREF_OPTIONS.map((label) => (
-              <button
-                key={label}
-                onClick={() => toggleOnboardingPref(label)}
-                style={{ ...chip(onboarding.prefs.includes(label)), width: "100%", textAlign: "left" }}
-              >
-                {label}
-              </button>
-            ))}
+            {PREF_OPTIONS.map((label) => {
+              const on = onboarding.prefs.includes(label);
+              const nextPrefs = on ? onboarding.prefs.filter((p) => p !== label) : [...onboarding.prefs, label].slice(-2);
+              return (
+                <button
+                  key={label}
+                  onClick={() => void completeOnboarding({ prefs: nextPrefs })}
+                  style={{ ...chip(on), width: "100%", textAlign: "left" }}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

@@ -26,6 +26,9 @@ interface BackendUser {
   email: string;
   onboarding_completed: boolean;
   screen_mode: "easy" | "standard" | null;
+  age: string | null;
+  topics: string[];
+  prefs: string[];
   created_at: string;
 }
 
@@ -42,7 +45,17 @@ function toUser(u: BackendUser): User {
     email: u.email,
     onboardingCompleted: u.onboarding_completed,
     screenMode: u.screen_mode ?? "",
+    age: u.age ?? "",
+    topics: u.topics,
+    prefs: u.prefs,
   };
+}
+
+export interface CompleteOnboardingPayload {
+  screenMode?: ScreenView;
+  age?: string;
+  topics?: string[];
+  prefs?: string[];
 }
 
 function toAuthResponse(res: BackendAuthResponse): AuthResponse {
@@ -66,11 +79,20 @@ export const authApi = {
       })
       .then(toAuthResponse),
   me: () => apiClient.get<BackendUser>("/auth/me").then(toUser),
-  // screenMode is optional: omit it to keep the previous onboarding_completed-only behavior.
-  completeOnboarding: (screenMode?: ScreenView) =>
-    apiClient
-      .patch<BackendUser>("/auth/me/onboarding", screenMode ? { screen_mode: screenMode } : undefined)
-      .then(toUser),
+  // Every field is optional: omit one to leave it unchanged server-side (existing screen_mode-only
+  // callers keep working). age accepts "" (explicit deselect), so it's checked separately from the
+  // others via `!== undefined` rather than truthiness.
+  completeOnboarding: (payload?: CompleteOnboardingPayload) => {
+    const body: Record<string, unknown> = {};
+    if (payload?.screenMode) body.screen_mode = payload.screenMode;
+    if (payload?.age !== undefined) body.age = payload.age;
+    if (payload?.topics !== undefined) body.topics = payload.topics;
+    if (payload?.prefs !== undefined) body.prefs = payload.prefs;
+
+    return apiClient
+      .patch<BackendUser>("/auth/me/onboarding", Object.keys(body).length > 0 ? body : undefined)
+      .then(toUser);
+  },
   // TODO: /auth/find-id, /auth/find-password have no backend endpoint yet — FindIdModal/FindPwModal
   // don't call these (still pure UI mockups), so leaving them unconnected for now.
   findId: (email: string) => apiClient.post<{ id: string }>("/auth/find-id", { email }),
