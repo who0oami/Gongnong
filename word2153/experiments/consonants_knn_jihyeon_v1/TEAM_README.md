@@ -1,80 +1,89 @@
 # 자음 18개 · KNN + Jihyeon 손 모양 보정
 
-**작성자**: Jihyeon (2026-09)
+자음 수어 영상 18개를 대상으로 손 키포인트를 추출하고, 기존 리타게팅 결과에 KNN 손 모양 보정과 Jihyeon 손가락 방향 보정을 적용해 비교하는 독립 실험입니다.
 
-## 무엇을 하는가
+기존 `word2153/` 파이프라인, `feature/knn-hand-shape-correction-jihyeon` 브랜치, Robin 리타게팅 코드는 수정하지 않습니다. 이 실험의 코드는 `experiments/consonants_knn_jihyeon_v1/` 안에서만 실행하며, 결과도 별도 폴더에 저장합니다.
 
-`ㄴ`부터 `ㅉ`까지 자음 18개 영상의 손 모양을 기존 아바타 결과와 비교하고, 손가락 방향이 어긋나는 프레임을 보정하는 별도 테스트입니다.
+## 폴더 구조
 
-기존 출력이나 기존 브랜치의 파일을 덮어쓰지 않습니다. 각 동작은 `baseline`, `knn`, `knn + Jihyeon` 세 결과로 새로 저장합니다.
+```text
+word2153/
+├─ experiments/consonants_knn_jihyeon_v1/
+│  ├─ extract_all.py       영상 18개 → raw/refined/stable/smoothed JSON
+│  ├─ process_all.py       baseline/knn/knn+Jihyeon .blend 생성
+│  ├─ render_all.py        Blender 렌더 → 비교 MP4
+│  ├─ verify_all.py        저장 결과 보존 검증
+│  ├─ build_review.py      비교 화면과 요약 생성
+│  ├─ vendor/              참고 브랜치 코드의 읽기 전용 스냅샷
+│  ├─ runs/                실행 결과 — 용량 문제로 git 미포함
+│  └─ TEAM_README.md       이 실험 설명
+├─ output/consonant_final_v4/
+│                          Blender에서 다시 여는 .blend 결과
+└─ output/consonant_jihyeon_test_v1/videos/
+                           원본/기존/KNN/Jihyeon 비교용 MP4
+```
 
-## 왜 필요한가
-
-단안 영상에서 손을 추출하면 손 crop 검출과 Holistic 검출이 프레임마다 다르게 잡힐 수 있습니다. 그 결과 손가락이 떨리거나, 손가락 방향과 손바닥 방향이 실제 영상과 다르게 보일 수 있습니다.
-
-KNN은 기존 3D 손 모양 코퍼스에서 가까운 모양을 찾아 굽힘 크기를 보정합니다. Jihyeon 보정은 손바닥과 부모 마디를 기준으로 손가락 방향을 다시 계산합니다. 두 방법을 같은 입력 영상에 적용해 결과를 비교했습니다.
+`consonant_final_v4`와 `consonant_jihyeon_test_v1/videos`는 같은 파일을 중복한 폴더가 아닙니다. 전자는 Blender 편집용 `.blend`, 후자는 영상 검토용 `.mp4`를 보관합니다.
 
 ## 처리 대상
 
-`output/consonant_replacements`, `output/consonant_recordings`의 다음 18개입니다.
+`output/consonant_replacements`, `output/consonant_recordings`의 `WORD3002`~`WORD3019`입니다.
 
 ```text
-WORD3002 ㄴ   WORD3003 ㄷ   WORD3004 ㄹ   WORD3005 ㅁ
-WORD3006 ㅂ   WORD3007 ㅅ   WORD3008 ㅇ   WORD3009 ㅈ
-WORD3010 ㅊ   WORD3011 ㅋ   WORD3012 ㅌ   WORD3013 ㅍ
-WORD3014 ㅎ   WORD3015 ㄲ   WORD3016 ㄸ   WORD3017 ㅃ
-WORD3018 ㅆ   WORD3019 ㅉ
+ㄴ ㄷ ㄹ ㅁ ㅂ ㅅ ㅇ ㅈ ㅊ ㅋ ㅌ ㅍ ㅎ ㄲ ㄸ ㅃ ㅆ ㅉ
 ```
 
-## 처리 순서
+## 처리 과정
 
-1. MediaPipe Holistic으로 몸·손 좌표를 추출합니다.
+1. MediaPipe Holistic으로 몸·손 키포인트를 추출합니다.
 2. 손 crop 재검출, 좌우 손 확인, 시간 평활을 적용합니다.
-3. 기존 per-video 리타게팅을 `baseline`으로 저장합니다.
-4. `baseline`에 hand-shape KNN 보정을 적용해 `knn`을 저장합니다.
-5. `knn` 결과에 손바닥 기준 손가락 chain/minimum-swing 방향 계산을 적용해 `knn + Jihyeon`을 저장합니다.
-6. Blender에서 전체 동작과 손 확대 영상을 렌더해 원본 영상과 비교합니다.
+3. 기존 per-video 리타게팅 결과를 `baseline`으로 생성합니다.
+4. baseline에 hand-shape KNN prior 보정을 적용해 `knn` 결과를 생성합니다.
+5. knn 결과에 손바닥 기준 chain/minimum-swing 손가락 방향 보정을 적용해 `knn + Jihyeon` 결과를 생성합니다.
+6. 세 결과를 Blender에서 렌더해 원본 영상과 비교합니다.
 
-팔·손목·몸통·표정은 baseline을 유지하고 손가락 bone만 보정합니다. KNN 보정이 관측 손 모양에서 더 멀어지는 경우에는 baseline으로 되돌립니다. 최종 손가락 회전 변화는 30fps 기준 16°/frame 이하로 제한했습니다.
+팔·손목·몸통·표정은 baseline을 유지하고 손가락 bone만 보정합니다. KNN 보정이 관측 손 모양에서 더 멀어지는 경우에는 baseline으로 되돌립니다. 최종 손가락 회전 변화는 30fps 기준 16°/frame 이하로 제한합니다.
 
-## 결과
+## 빠른 시작
 
-손 좌표와 아바타 손가락 방향의 평균 오차는 다음과 같습니다.
+PowerShell에서 `word2153` 디렉터리 기준으로 실행합니다.
 
-| 결과 | 평균 오차 |
-| --- | ---: |
-| baseline | 27.98° |
-| knn | 29.13° |
-| knn + Jihyeon | 20.69° |
+```powershell
+python experiments/consonants_knn_jihyeon_v1/extract_all.py
+python experiments/consonants_knn_jihyeon_v1/process_all.py
+python experiments/consonants_knn_jihyeon_v1/render_all.py
+& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" --background --python-exit-code 1 --python experiments/consonants_knn_jihyeon_v1/verify_all.py
+python experiments/consonants_knn_jihyeon_v1/build_review.py
+```
 
-이번 자음 18개에서는 KNN만 적용한 결과가 baseline보다 좋아지지 않았습니다. KNN 위에 Jihyeon 손가락 방향 보정을 적용한 결과는 18개 모두 KNN보다 낮은 오차를 보였습니다.
+각 단계는 이미 검증된 `runs/<word_id>/` 결과를 다시 덮어쓰지 않습니다. 새 결과를 만들 때는 새 버전 폴더를 사용합니다.
 
-저장된 blend를 다시 열어 정수·중간 프레임을 검사했습니다. 손가락 이외의 bone, 오브젝트, 얼굴 shape key의 최대 오차는 0.0이었고, 18개 모두 보존 검사를 통과했습니다.
+## 결과 확인
 
-## 파일 위치
+- 비교 화면: `experiments/consonants_knn_jihyeon_v1/index.html`
+- 영상: `output/consonant_jihyeon_test_v1/videos/WORDxxxx_*.mp4`
+- Blender 파일: `output/consonant_final_v4/WORDxxxx_knn_jihyeon_v4.blend`
+- 검증 결과: `experiments/consonants_knn_jihyeon_v1/preservation_verification.json`
 
-- 실행 코드·검증 기록: `experiments/consonants_knn_jihyeon_v1/`
-- Blender 결과: `output/consonant_final_v4/`
-- 비교용 영상: `output/consonant_jihyeon_test_v1/videos/`
-- 비교 화면: `index.html`
+Blender 파일은 Blender 5.2에서 열고 3D 뷰포트에 마우스를 둔 뒤 Space bar로 재생합니다. MP4는 원본, baseline, KNN, Jihyeon 결과를 같은 동작 번호로 비교합니다.
 
-`consonant_final_v4`는 Blender에서 다시 열 수 있는 `.blend` 파일입니다. `consonant_jihyeon_test_v1/videos`는 원본, baseline, KNN, Jihyeon 결과를 MP4로 확인하는 폴더입니다. 목적이 달라 두 폴더로 나누어 보관합니다.
+## 확인 결과
 
-## 기존 브랜치와의 관계
+18개, 총 1,454프레임을 처리했습니다. 손 좌표와 아바타 손가락 방향의 평균 오차는 baseline 27.98°, KNN 29.13°, KNN + Jihyeon 20.69°였습니다. 저장된 blend를 다시 열어 정수·중간 프레임을 검사했으며, 손가락 이외의 bone·오브젝트·얼굴 shape key 최대 오차는 0.0이었습니다.
 
-기존 KNN 브랜치 `feature/knn-hand-shape-correction-jihyeon`은 삭제하거나 수정하지 않았습니다. 이 실험은 해당 브랜치와 리타게팅 참고 코드를 `vendor/`에 읽기 전용 스냅샷으로 두고 별도 경로에서 실행합니다.
+이번 자음 세트에서는 KNN 단독 결과가 baseline보다 좋아지지 않았습니다. KNN + Jihyeon 결과는 18개 모두 KNN보다 낮은 오차를 보였습니다.
 
-현재 브랜치:
+## 브랜치와 참고 코드
 
-`feature/consonants-knn-jihyeon-v1`
+- 현재 실험 브랜치: `feature/consonants-knn-jihyeon-v1`
+- KNN 참고 브랜치: `feature/knn-hand-shape-correction-jihyeon`
+- 리타게팅 참고 코드: `vendor/robin/`
 
-## 명시적으로 주장하지 않는 것
+참고 코드는 읽기 전용으로 복사했으며 원래 브랜치 파일을 덮어쓰지 않았습니다.
 
-- 오차 수치는 MediaPipe에서 추출한 손 좌표와의 기하학적 일치도이며 수어 의미 정확도 점수가 아닙니다.
-- 원본 검출이 잘못된 프레임을 자동으로 정답으로 바꾸지는 않습니다.
-- 흔들림의 최종 보정, 손목·팔 연동, 배경·카메라·조명 설정은 이 실험의 범위가 아닙니다.
+## 명시적으로 확인하지 않은 것
+
+- 오차 수치는 추출 키포인트와의 기하학적 일치도이지 수어 의미 정확도 점수가 아닙니다.
+- MediaPipe 검출 자체가 틀린 프레임을 자동으로 복원하지는 않습니다.
+- 흔들림의 최종 보정, 손목·팔 연동, 배경·카메라·조명·최종 렌더 설정은 다음 작업 범위입니다.
 - 최종 채택 전에는 원본 영상과 MP4를 함께 재생해 사람이 직접 확인해야 합니다.
-
-## 팀원 다음 작업
-
-로빈은 이 결과를 기준으로 프레임 흔들림, 손목과 손가락의 연동, 배경·카메라·조명·최종 렌더 설정을 이어서 확인합니다. 기존 결과를 덮어쓰지 않고 새 버전 폴더와 새 커밋으로 작업합니다.
