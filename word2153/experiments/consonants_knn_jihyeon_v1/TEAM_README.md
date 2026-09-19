@@ -1,8 +1,8 @@
 # 자음 18개 · KNN + Jihyeon 손 모양 보정
 
-자음 수어 영상 18개를 대상으로 손 키포인트를 추출하고, 기존 리타게팅 결과에 KNN 손 모양 보정과 Jihyeon 손가락 방향 보정을 적용해 비교하는 독립 실험입니다.
+자음 수어 영상 18개에서 손 키포인트를 추출하고, 기존 리타게팅 결과에 KNN 손 모양 보정과 Jihyeon 손가락 방향 보정을 적용하는 파이프라인입니다.
 
-기존 `word2153/` 파이프라인, `feature/knn-hand-shape-correction-jihyeon` 브랜치, Robin 리타게팅 코드는 수정하지 않습니다. 이 실험의 코드는 `experiments/consonants_knn_jihyeon_v1/` 안에서만 실행하며, 결과도 별도 폴더에 저장합니다.
+기존 `word2153/` 파이프라인과 `feature/knn-hand-shape-correction-jihyeon` 브랜치는 수정하지 않습니다. 리타게팅 참고 코드는 `vendor/`에 읽기 전용으로 보관하고, 이 파이프라인의 결과는 별도 폴더에 저장합니다.
 
 ## 폴더 구조
 
