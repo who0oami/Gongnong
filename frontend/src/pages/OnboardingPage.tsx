@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import TransparentImg from "../components/common/TransparentImg";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../state/AppContext";
+import { useAuth } from "../hooks/useAuth";
 import { AGE_OPTIONS, ICON, PREF_OPTIONS, TOPIC_OPTIONS } from "../constants";
 import { obChipStyle, obMark, obRowStyle } from "../styles";
 import logo from "../assets/logo.png";
@@ -16,11 +17,13 @@ export default function OnboardingPage() {
   const location = useLocation();
   const { onboarding, setOnboarding, toggleOnboardingTopic, toggleOnboardingPref, setScreenView, setProfile, settings, setSettings } =
     useApp();
+  const { completeOnboarding } = useAuth();
 
   const initialName = (location.state as { name?: string } | null)?.name ?? "";
   const [step, setStep] = useState(1);
   const [name, setName] = useState(initialName);
   const [error, setError] = useState("");
+  const [finishing, setFinishing] = useState(false);
   const pickTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => () => window.clearTimeout(pickTimer.current), []);
@@ -64,13 +67,20 @@ export default function OnboardingPage() {
     pickTimer.current = window.setTimeout(() => setStep(5), 380);
   }
 
-  function finish() {
+  async function finish() {
     const trimmed = name.trim();
     if (trimmed) setProfile({ name: trimmed });
     if (onboarding.prefs.includes("자막도 함께 보고 싶어요") && !settings.subtitles) {
       setSettings({ subtitles: true });
     }
-    navigate("/home");
+    setFinishing(true);
+    try {
+      await completeOnboarding(onboarding.view);
+      navigate("/home");
+    } catch {
+      setError("온보딩 완료 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      setFinishing(false);
+    }
   }
 
   const doneTitle = `${name.trim() || "회원"}님에게 맞는 공농이 준비됐어요!`;
@@ -331,8 +341,14 @@ export default function OnboardingPage() {
               {doneTitle}
             </h1>
             <p style={{ fontSize: "14px", color: "#747C78", margin: "0 0 32px" }}>선택한 설정은 언제든지 변경할 수 있어요.</p>
+            {error && (
+              <p style={{ fontSize: "14px", color: "#EF4444", background: "#FEF2F2", borderRadius: "12px", padding: "12px 16px", margin: "0 0 20px" }}>
+                {error}
+              </p>
+            )}
             <button
               onClick={finish}
+              disabled={finishing}
               className="hover-primary"
               style={{
                 display: "inline-flex",
@@ -345,7 +361,8 @@ export default function OnboardingPage() {
                 padding: "15px 28px",
                 border: "none",
                 borderRadius: "12px",
-                cursor: "pointer",
+                cursor: finishing ? "default" : "pointer",
+                opacity: finishing ? 0.7 : 1,
                 whiteSpace: "nowrap",
               }}
             >

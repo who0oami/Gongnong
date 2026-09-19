@@ -8,6 +8,7 @@ import EmptyState from "../components/common/EmptyState";
 import type { HistoryStatus } from "../types";
 import { ICON } from "../constants";
 import type { NewGroupArg } from "../components/feature/modals/NewGroupModal";
+import gnWatch from "../assets/gn-watch.png";
 
 const badgeStyle = (status: HistoryStatus) => ({
   flexShrink: 0,
@@ -34,7 +35,8 @@ export default function HistoryPage() {
   const viewingGroupObj = (tab === "all" || tab === "groups") ? null : groups.find((g) => g.id === tab) ?? null;
   const items = tab === "all" ? history : history.filter((h) => viewingGroupObj?.itemIds.includes(h.id));
   const groupEmpty = items.length === 0 && tab !== "all" && tab !== "groups";
-  const showGroupList = (tab === "all" || tab === "groups") && groups.length > 0;
+  const allEmpty = tab === "all" && history.length === 0;
+  const showGroupList = tab === "groups";
   const showGroupsTab = tab === "groups";
 
   function play(url: string) {
@@ -226,14 +228,27 @@ export default function HistoryPage() {
           );
         })}
         {groupEmpty && <EmptyState padding="40px 0" color="#747C78" title="이 그룹에 영상이 없습니다" />}
+        {allEmpty && (
+          <EmptyState
+            padding="32px 0"
+            titleWeight={500}
+            title="아직 변환한 영상이 없어요"
+            description="홈에서 유튜브 링크를 입력해보세요"
+            descriptionColor="#747C78"
+            icon={
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
+                <img src={gnWatch} alt="" style={{ width: "72px", height: "auto" }} />
+              </div>
+            }
+          />
+        )}
       </div>
 
       {showGroupList && (
-        <div style={{ marginTop: showGroupsTab ? "0" : "32px" }}>
-          {!showGroupsTab && <h2 style={{ fontSize: "14px", fontWeight: 700, margin: "0 0 12px" }}>내 그룹</h2>}
-          {showGroupsTab && groups.length === 0 && (
+        <div>
+          {groups.length === 0 && (
             <EmptyState
-              padding="60px 0"
+              padding="40px 0"
               color="#B0B8B4"
               title="저장한 그룹이 없어요"
               description="시청 기록에서 영상을 그룹에 추가해보세요"

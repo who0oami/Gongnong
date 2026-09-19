@@ -1,14 +1,14 @@
 import { apiClient } from "./client";
-import type { User } from "../types";
+import type { ScreenView, User } from "../types";
 
 export interface LoginRequest {
-  id: string;
+  id: string; // username or email — backend accepts either
   password: string;
 }
 
 export interface SignupRequest {
   name: string;
-  id: string;
+  id: string; // becomes `username`
   email: string;
   password: string;
 }
@@ -18,18 +18,61 @@ export interface AuthResponse {
   accessToken: string;
 }
 
-// TODO: none of these paths/payloads are confirmed with the backend yet — treat them as a
-// placeholder shape to wire real endpoints into once the API spec exists. Unconfirmed:
-// - endpoint paths themselves (/auth/*)
-// - login/signup identifier field: `id` vs `username`/`email`
-// - AuthResponse envelope: bare {user, accessToken} vs wrapped (see types/api.ts ApiResponse<T>)
-//
-// 백엔드 확정: 세션은 JWT 방식, access_token만 발급 (MVP에서는 refreshToken 생략). AuthResponse의
-// accessToken이 이 JWT access_token에 해당하며, 만료 시 별도 갱신 없이 재로그인이 필요하다.
+// Shape actually returned by POST /auth/signup, /auth/login, GET /auth/me, PATCH /auth/me/onboarding.
+interface BackendUser {
+  id: number;
+  name: string;
+  username: string;
+  email: string;
+  onboarding_completed: boolean;
+  screen_mode: "easy" | "standard" | null;
+  created_at: string;
+}
+
+interface BackendAuthResponse {
+  access_token: string;
+  token_type: string;
+  user: BackendUser;
+}
+
+function toUser(u: BackendUser): User {
+  return {
+    id: String(u.id),
+    name: u.name,
+    email: u.email,
+    onboardingCompleted: u.onboarding_completed,
+    screenMode: u.screen_mode ?? "",
+  };
+}
+
+function toAuthResponse(res: BackendAuthResponse): AuthResponse {
+  return { user: toUser(res.user), accessToken: res.access_token };
+}
+
+// 백엔드 확정: 세션은 JWT 방식, access_token만 발급 (MVP에서는 refreshToken 생략). 만료 시 별도
+// 갱신 없이 재로그인이 필요하다 — 그래서 logout()도 서버 호출 없이 로컬 토큰 삭제로 끝난다.
 export const authApi = {
-  login: (payload: LoginRequest) => apiClient.post<AuthResponse>("/auth/login", payload),
-  signup: (payload: SignupRequest) => apiClient.post<AuthResponse>("/auth/signup", payload),
-  logout: () => apiClient.post<void>("/auth/logout"),
+  login: (payload: LoginRequest) =>
+    apiClient
+      .post<BackendAuthResponse>("/auth/login", { username_or_email: payload.id, password: payload.password })
+      .then(toAuthResponse),
+  signup: (payload: SignupRequest) =>
+    apiClient
+      .post<BackendAuthResponse>("/auth/signup", {
+        name: payload.name,
+        username: payload.id,
+        email: payload.email,
+        password: payload.password,
+      })
+      .then(toAuthResponse),
+  me: () => apiClient.get<BackendUser>("/auth/me").then(toUser),
+  // screenMode is optional: omit it to keep the previous onboarding_completed-only behavior.
+  completeOnboarding: (screenMode?: ScreenView) =>
+    apiClient
+      .patch<BackendUser>("/auth/me/onboarding", screenMode ? { screen_mode: screenMode } : undefined)
+      .then(toUser),
+  // TODO: /auth/find-id, /auth/find-password have no backend endpoint yet — FindIdModal/FindPwModal
+  // don't call these (still pure UI mockups), so leaving them unconnected for now.
   findId: (email: string) => apiClient.post<{ id: string }>("/auth/find-id", { email }),
   findPassword: (id: string, email: string) => apiClient.post<void>("/auth/find-password", { id, email }),
 };

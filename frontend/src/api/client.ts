@@ -1,5 +1,5 @@
 import type { ApiErrorResponse } from "../types";
-import { getAuthToken } from "./tokenStorage";
+import { clearAuthToken, getAuthToken } from "./tokenStorage";
 
 // baseURL is read from the environment so it can differ between local/dev/prod without code
 // changes. See .env.example for the variable name.
@@ -27,8 +27,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
 
   if (!res.ok) {
-    const message = await res.text().catch(() => res.statusText);
-    throw new ApiError(message || res.statusText, res.status);
+    // Backend's exception handlers reply with {"error": "..."} rather than plain text.
+    const body = await res.json().catch(() => null);
+    const message = (body && typeof body.error === "string" ? body.error : null) ?? res.statusText;
+
+    // A 401 on a request that carried a token means the session itself is invalid/expired —
+    // not a login-page wrong-password 401, since those requests never carry a token. Only that
+    // case should force a fresh login.
+    if (res.status === 401 && token) {
+      clearAuthToken();
+      if (window.location.pathname !== "/login") window.location.href = "/login";
+    }
+
+    throw new ApiError(message, res.status);
   }
 
   if (res.status === 204) return undefined as T;

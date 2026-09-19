@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useModal } from "../state/ModalContext";
 import { useAuth } from "../hooks/useAuth";
 import { ApiError } from "../api/client";
@@ -8,7 +8,6 @@ import logo from "../assets/logo.png";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { openModal } = useModal();
   const { login, loginDemo } = useAuth();
   const [id, setId] = useState("");
@@ -24,9 +23,8 @@ export default function LoginPage() {
     setError("");
     setSubmitting(true);
     try {
-      const isDemo = await login({ id, password: pw });
-      const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? "/home";
-      navigate(isDemo ? "/onboarding" : from, { replace: true });
+      await login({ id, password: pw });
+      navigate("/home", { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "로그인에 실패했습니다. 잠시 후 다시 시도해주세요.");
     } finally {
@@ -34,7 +32,8 @@ export default function LoginPage() {
     }
   }
 
-  // DEV-ONLY — see useAuth.ts's DEMO_LOGIN comment for how to remove this once real auth exists.
+  // Logs into (or creates, on first use) the shared demo backend account — see loginDemo in
+  // useAuth.ts. Always lands on /onboarding since a fresh demo account has never completed it.
   async function demoLogin() {
     setError("");
     setSubmitting(true);

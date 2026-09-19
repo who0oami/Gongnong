@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useApp, useEasyMode } from "../state/AppContext";
 import { thumbOf } from "../utils/video";
 import EmptyState from "../components/common/EmptyState";
-import gnWatch from "../assets/gn-watch.png";
+import recentEmptyIcon from "../assets/recent-empty-icon.png";
+import groupPlaceholder from "../assets/group-placeholder.png";
 import { ICON } from "../constants";
 
 const YT_REGEX = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/;
@@ -239,14 +240,14 @@ function StandardHome() {
       </div>
 
       <div style={{ maxWidth: "896px", margin: "0 auto", padding: "32px 16px" }}>
-        {recent.length > 0 ? (
-          <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-              <h2 style={{ fontSize: "16px", fontWeight: 700, margin: 0 }}>최근 변환 기록</h2>
-              <button onClick={() => navigate("/history")} style={{ background: "none", border: "none", fontSize: "14px", fontWeight: 500, color: "#10B45F", cursor: "pointer" }}>
-                전체 보기
-              </button>
-            </div>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+            <h2 style={{ fontSize: "16px", fontWeight: 700, margin: 0 }}>최근 변환 기록</h2>
+            <button onClick={() => navigate("/history")} style={{ background: "none", border: "none", fontSize: "14px", fontWeight: 500, color: "#10B45F", cursor: "pointer" }}>
+              전체 보기
+            </button>
+          </div>
+          {recent.length > 0 ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "12px" }}>
               {recent.map((r) => (
                 <button
@@ -270,30 +271,32 @@ function StandardHome() {
                 </button>
               ))}
             </div>
-          </div>
-        ) : (
-          <EmptyState
-            padding="40px 0"
-            titleWeight={500}
-            title="아직 변환한 영상이 없어요"
-            description="위에서 유튜브 링크를 입력해보세요"
-            descriptionColor="#747C78"
-            icon={
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
-                <img src={gnWatch} alt="" style={{ width: "88px", height: "auto" }} />
-              </div>
-            }
-          />
-        )}
-
-        {groups.length > 0 && (
-          <div style={{ marginTop: "32px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-              <h2 style={{ fontSize: "16px", fontWeight: 700, margin: 0 }}>내 그룹</h2>
-              <button onClick={() => navigate("/history")} style={{ background: "none", border: "none", fontSize: "14px", fontWeight: 500, color: "#10B45F", cursor: "pointer" }}>
-                관리
-              </button>
+          ) : (
+            <div style={{ background: "#fff", border: "1px solid #E5E8E7", borderRadius: "16px" }}>
+              <EmptyState
+                padding="24px 0 40px"
+                titleWeight={500}
+                title="최근 변환한 기록이 없어요"
+                description="첫 영상을 시청하고 공농을 경험해보세요!"
+                descriptionColor="#747C78"
+                icon={
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
+                    <img src={recentEmptyIcon} alt="" style={{ width: "72px", height: "auto" }} />
+                  </div>
+                }
+              />
             </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: "32px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+            <h2 style={{ fontSize: "16px", fontWeight: 700, margin: 0 }}>내 그룹</h2>
+            <button onClick={() => navigate("/history", { state: { tab: "groups" } })} style={{ background: "none", border: "none", fontSize: "14px", fontWeight: 500, color: "#10B45F", cursor: "pointer" }}>
+              관리
+            </button>
+          </div>
+          {groups.length > 0 ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "12px" }}>
               {groups.map((g) => {
                 const gitems = history.filter((h) => g.itemIds.includes(h.id));
@@ -341,8 +344,23 @@ function StandardHome() {
                 );
               })}
             </div>
-          </div>
-        )}
+          ) : (
+            <button
+              onClick={() => navigate("/history", { state: { tab: "groups" } })}
+              className="hover-card"
+              style={{ width: "100%", background: "#fff", border: "1px solid #E5E8E7", borderRadius: "16px", padding: "16px", display: "flex", alignItems: "center", gap: "16px", cursor: "pointer", textAlign: "left" }}
+            >
+              <img src={groupPlaceholder} alt="" style={{ width: "44px", height: "44px", flexShrink: 0, objectFit: "contain" }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: "14px", fontWeight: 600, margin: 0 }}>저장한 영상</p>
+                <p style={{ fontSize: "12px", color: "#747C78", margin: 0 }}>영상 0개</p>
+              </div>
+              <svg viewBox="0 0 24 24" style={{ width: "16px", height: "16px", fill: "#747C78", flexShrink: 0 }}>
+                <path d={ICON.chevronRight} />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

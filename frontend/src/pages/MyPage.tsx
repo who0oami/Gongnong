@@ -12,8 +12,8 @@ export default function MyPage() {
   const easy = useEasyMode();
   const navigate = useNavigate();
   const { openModal } = useModal();
-  const { logout } = useAuth();
-  const { profile, history, settings, setSettings, onboarding, setOnboarding, toggleOnboardingTopic, toggleOnboardingPref, setScreenView } =
+  const { logout, completeOnboarding } = useAuth();
+  const { profile, history, settings, setSettings, onboarding, setOnboarding, toggleOnboardingTopic, toggleOnboardingPref } =
     useApp();
 
   const done = history.filter((h) => h.status === "완료");
@@ -70,10 +70,10 @@ export default function MyPage() {
         <div style={{ padding: "14px 0", borderBottom: "1px solid #E5E8E7" }}>
           <p style={{ fontSize: "14px", fontWeight: 500, margin: "0 0 10px" }}>화면 모드</p>
           <div style={{ display: "flex", gap: "8px" }}>
-            <button onClick={() => setScreenView("easy")} style={chip(onboarding.view === "easy")}>
+            <button onClick={() => void completeOnboarding("easy")} style={chip(onboarding.view === "easy")}>
               쉬운 화면
             </button>
-            <button onClick={() => setScreenView("standard")} style={chip(onboarding.view === "standard")}>
+            <button onClick={() => void completeOnboarding("standard")} style={chip(onboarding.view === "standard")}>
               기본 화면
             </button>
           </div>
@@ -193,7 +193,7 @@ export default function MyPage() {
       <button
         onClick={() => {
           logout();
-          navigate("/");
+          navigate("/login");
         }}
         className="hover-red-bg"
         style={{ width: "100%", padding: "14px", fontSize: "14px", fontWeight: 600, color: "#EF4444", background: "#fff", border: "1px solid #FEE2E2", borderRadius: "16px", cursor: "pointer" }}
