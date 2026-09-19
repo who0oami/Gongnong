@@ -1,7 +1,11 @@
 import asyncio
 import subprocess
+from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from database import SessionLocal, get_db
 from schemas.youtube import YoutubeRequest
 from schemas.job import Job, JobStatus, JobResult, JobSegment
 from services import job_repository
@@ -36,119 +40,169 @@ def _get_clip_duration(code: str) -> float:
 
 
 async def process_job(job_id: str, url: str) -> None:
-    video_id = extract_video_id(url)
-
-    if video_id is None:
-        job_repository.update_job(
-            job_id,
-            status=JobStatus.FAILED,
-            failed_stage="TRANSCRIPTING",
-            error_code="INVALID_URL",
-            error_message="URL에서 영상 ID를 찾을 수 없습니다.",
-        )
-        return
-
-    job_repository.update_job(job_id, status=JobStatus.TRANSCRIPTING)
-
+    db = SessionLocal()
     try:
-        transcript_data = await asyncio.to_thread(get_corrected_transcript_data, url)
-    except ValueError as e:
-        job_repository.update_job(
-            job_id,
-            status=JobStatus.FAILED,
-            failed_stage="TRANSCRIPTING",
-            error_code="TRANSCRIPT_ERROR",
-            error_message=str(e),
-        )
-        return
+        video_id = extract_video_id(url)
 
-    full_text = transcript_data["transcript"]
-    raw_segments = transcript_data["segments"]
-    segments = [
-        JobSegment(
-            start=seg["start"],
-            end=seg["end"],
-            source_text=seg["text"],
-            corrected_text=seg.get("corrected_text"),
-        )
-        for seg in raw_segments
-    ]
-
-    # KSL_CONVERTING: 시안 문장은 DEMO_GLOSS_OVERRIDE로 바로 대체하고,
-    # 그 외 문장만 실제 Gemini 호출로 gloss 변환한다.
-    job_repository.update_job(job_id, status=JobStatus.KSL_CONVERTING)
-
-    timeline_segments: list[dict] = []
-
-    for seg in segments:
-        override_codes = DEMO_GLOSS_OVERRIDE.get(seg.source_text)
-
-        if override_codes is not None:
-            timeline_segments.append({
-                "start": seg.start,
-                "end": seg.end,
-                "display_sequence": build_display_sequence_from_codes(override_codes),
-            })
-            continue
-
-        try:
-            gloss_sequence = await asyncio.to_thread(
-                convert_to_gloss,
-                seg.corrected_text or seg.source_text,
-            )
-        except GlossConversionError as e:
-            job_repository.update_job(
+        if video_id is None:
+            job_repository.update_translation_job_db(
+                db,
                 job_id,
                 status=JobStatus.FAILED,
-                failed_stage="KSL_CONVERTING",
-                error_code="GLOSS_CONVERSION_ERROR",
+                error_message="URL에서 영상 ID를 찾을 수 없습니다.",
+            )
+            return
+
+        job_repository.update_translation_job_db(db, job_id, status=JobStatus.TRANSCRIPTING)
+
+        try:
+            transcript_data = await asyncio.to_thread(get_corrected_transcript_data, url)
+        except ValueError as e:
+            job_repository.update_translation_job_db(
+                db,
+                job_id,
+                status=JobStatus.FAILED,
                 error_message=str(e),
             )
             return
 
-        timeline_segments.append({
-            "start": seg.start,
-            "end": seg.end,
-            "gloss_sequence": gloss_sequence,
-        })
+        full_text = transcript_data["transcript"]
+        raw_segments = transcript_data["segments"]
+        segments = [
+            JobSegment(
+                start=seg["start"],
+                end=seg["end"],
+                source_text=seg["text"],
+                corrected_text=seg.get("corrected_text"),
+            )
+            for seg in raw_segments
+        ]
 
-    # SIGN_MAPPING: 실제 아바타 코드 매칭(gloss -> word/sen code)은
-    # build_timeline 내부에서 build_display_sequence를 통해 이뤄진다.
-    job_repository.update_job(job_id, status=JobStatus.SIGN_MAPPING)
+        translation_job = job_repository.get_translation_job_db(db, job_id)
+        if translation_job is None:
+            return
 
-    job_repository.update_job(job_id, status=JobStatus.TIMELINE_BUILDING)
-
-    try:
-        timeline = await asyncio.to_thread(build_timeline, timeline_segments, _get_clip_duration)
-        video_url = await asyncio.to_thread(merge_timeline_to_video, timeline, DEMO_OUTPUT_FILENAME)
-    except Exception as e:
-        job_repository.update_job(
-            job_id,
-            status=JobStatus.FAILED,
-            failed_stage="TIMELINE_BUILDING",
-            error_code="TIMELINE_BUILD_ERROR",
-            error_message=str(e),
+        # TODO: Persist corrected_text after the DB migration.
+        job_repository.create_transcript_segments_db(
+            db,
+            translation_job_id=translation_job.id,
+            segments=segments,
         )
-        return
 
-    result = JobResult(transcript=full_text, segments=segments, video_url=video_url)
+        # KSL_CONVERTING: 시안 문장은 DEMO_GLOSS_OVERRIDE로 바로 대체하고,
+        # 그 외 문장만 실제 Gemini 호출로 gloss 변환한다.
+        job_repository.update_translation_job_db(db, job_id, status=JobStatus.KSL_CONVERTING)
 
-    job_repository.update_job(job_id, status=JobStatus.COMPLETED, result=result)
+        timeline_segments: list[dict] = []
+
+        for seg in segments:
+            override_codes = DEMO_GLOSS_OVERRIDE.get(seg.source_text)
+
+            if override_codes is not None:
+                timeline_segments.append({
+                    "start": seg.start,
+                    "end": seg.end,
+                    "display_sequence": build_display_sequence_from_codes(override_codes),
+                })
+                continue
+
+            try:
+                gloss_sequence = await asyncio.to_thread(
+                    convert_to_gloss,
+                    seg.corrected_text or seg.source_text,
+                )
+            except GlossConversionError as e:
+                job_repository.update_translation_job_db(
+                    db,
+                    job_id,
+                    status=JobStatus.FAILED,
+                    error_message=str(e),
+                )
+                return
+
+            timeline_segments.append({
+                "start": seg.start,
+                "end": seg.end,
+                "gloss_sequence": gloss_sequence,
+            })
+
+        # SIGN_MAPPING: 실제 아바타 코드 매칭(gloss -> word/sen code)은
+        # build_timeline 내부에서 build_display_sequence를 통해 이뤄진다.
+        job_repository.update_translation_job_db(db, job_id, status=JobStatus.SIGN_MAPPING)
+
+        job_repository.update_translation_job_db(db, job_id, status=JobStatus.TIMELINE_BUILDING)
+
+        try:
+            timeline = await asyncio.to_thread(build_timeline, timeline_segments, _get_clip_duration)
+            video_url = await asyncio.to_thread(merge_timeline_to_video, timeline, DEMO_OUTPUT_FILENAME)
+        except Exception as e:
+            job_repository.update_translation_job_db(
+                db,
+                job_id,
+                status=JobStatus.FAILED,
+                error_message=str(e),
+            )
+            return
+
+        result = JobResult(transcript=full_text, segments=segments, video_url=video_url)
+
+        # TODO: Persist/restore result.video_url and failure details after schema expansion.
+        job_repository.update_translation_job_db(
+            db,
+            job_id,
+            status=JobStatus.COMPLETED,
+            completed_at=datetime.now(),
+        )
+    finally:
+        db.close()
 
 
 @router.post("/translate/jobs", response_model=Job, status_code=202)
-async def create_translation_job(request: YoutubeRequest, background_tasks: BackgroundTasks):
-    job = job_repository.create_job(url=request.url)
+async def create_translation_job(
+    request: YoutubeRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    video_id = extract_video_id(request.url)
+
+    if video_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="URL에서 영상 ID를 찾을 수 없습니다.",
+        )
+
+    video = job_repository.get_or_create_video_db(
+        db,
+        source_url=request.url,
+        youtube_video_id=video_id,
+    )
+    translation_job = job_repository.create_translation_job_db(
+        db,
+        video_id=video.id,
+    )
+
+    job = Job(
+        job_id=str(translation_job.public_id),
+        status=JobStatus(translation_job.status),
+        url=request.url,
+    )
+
     background_tasks.add_task(process_job, job.job_id, request.url)
 
     return job
 
 
 @router.get("/translate/jobs/{job_id}", response_model=Job)
-async def get_translation_job(job_id: str):
-    job = job_repository.get_job(job_id)
+async def get_translation_job(job_id: str, db: Session = Depends(get_db)):
+    job_with_video = job_repository.get_translation_job_with_video_db(db, job_id)
 
-    if job is None:
+    if job_with_video is None:
         raise HTTPException(status_code=404, detail="존재하지 않는 job_id입니다.")
 
-    return job
+    translation_job, video = job_with_video
+    return Job(
+        job_id=str(translation_job.public_id),
+        status=JobStatus(translation_job.status),
+        url=video.source_url,
+        error_message=translation_job.error_message,
+    )

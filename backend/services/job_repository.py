@@ -1,7 +1,155 @@
+from datetime import datetime
 import uuid
-from schemas.job import Job, JobStatus
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from models.transcript_segment import TranscriptSegment
+from models.translation_job import TranslationJob
+from models.video import Video
+from schemas.job import Job, JobSegment, JobStatus
 
 _jobs: dict[str, Job] = {}
+
+
+def get_or_create_video_db(
+    db: Session,
+    source_url: str,
+    youtube_video_id: str,
+) -> Video:
+    statement = select(Video).where(
+        Video.youtube_video_id == youtube_video_id
+    )
+    video = db.execute(statement).scalar_one_or_none()
+
+    if video is not None:
+        return video
+
+    video = Video(
+        source_url=source_url,
+        youtube_video_id=youtube_video_id,
+    )
+
+    db.add(video)
+    db.commit()
+    db.refresh(video)
+
+    return video
+
+
+def create_translation_job_db(
+    db: Session,
+    video_id: int,
+    status: JobStatus = JobStatus.QUEUED,
+) -> TranslationJob:
+    translation_job = TranslationJob(
+        video_id=video_id,
+        status=status.value,
+        progress=0,
+    )
+
+    db.add(translation_job)
+    db.commit()
+    db.refresh(translation_job)
+
+    return translation_job
+
+
+def get_translation_job_db(
+    db: Session,
+    job_id: str,
+) -> TranslationJob | None:
+    try:
+        public_id = uuid.UUID(job_id)
+    except (ValueError, AttributeError):
+        return None
+
+    statement = select(TranslationJob).where(
+        TranslationJob.public_id == public_id
+    )
+
+    return db.execute(statement).scalar_one_or_none()
+
+
+def get_translation_job_with_video_db(
+    db: Session,
+    job_id: str,
+) -> tuple[TranslationJob, Video] | None:
+    try:
+        public_id = uuid.UUID(job_id)
+    except (ValueError, AttributeError):
+        return None
+
+    statement = (
+        select(TranslationJob, Video)
+        .join(Video, TranslationJob.video_id == Video.id)
+        .where(TranslationJob.public_id == public_id)
+    )
+    row = db.execute(statement).one_or_none()
+
+    if row is None:
+        return None
+
+    return row[0], row[1]
+
+
+def update_translation_job_db(
+    db: Session,
+    job_id: str,
+    *,
+    status: JobStatus | None = None,
+    progress: int | None = None,
+    error_message: str | None = None,
+    completed_at: datetime | None = None,
+) -> TranslationJob | None:
+    translation_job = get_translation_job_db(db, job_id)
+
+    if translation_job is None:
+        return None
+
+    if status is not None:
+        translation_job.status = status.value
+    if progress is not None:
+        translation_job.progress = progress
+    if error_message is not None:
+        translation_job.error_message = error_message
+    if completed_at is not None:
+        translation_job.completed_at = completed_at
+
+    db.commit()
+    db.refresh(translation_job)
+
+    return translation_job
+
+
+def create_transcript_segments_db(
+    db: Session,
+    translation_job_id: int,
+    segments: list[JobSegment],
+) -> list[TranscriptSegment]:
+    if not segments:
+        return []
+
+    transcript_segments = [
+        TranscriptSegment(
+            translation_job_id=translation_job_id,
+            sequence_no=sequence_no,
+            start_ms=round(segment.start * 1000),
+            end_ms=round(segment.end * 1000),
+            source_text=segment.source_text,
+            ksl_text=segment.ksl_text,
+            confidence=None,
+        )
+        for sequence_no, segment in enumerate(segments)
+    ]
+
+    db.add_all(transcript_segments)
+    db.commit()
+
+    for transcript_segment in transcript_segments:
+        db.refresh(transcript_segment)
+
+    return transcript_segments
 
 
 def create_job(url: str) -> Job:
