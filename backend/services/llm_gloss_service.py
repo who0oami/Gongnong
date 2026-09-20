@@ -1,77 +1,99 @@
-# TODO: 프롬프트 내용/규칙은 다른 팀원이 설계 중.
-# 여기 있는 프롬프트 문자열은 임시 더미이며,
-# 확정되면 이 부분만 교체 예정. 함수 시그니처(입출력)는 변경 없음.
+"""KSL Gloss 변환의 공통 진입점.
+
+기존 Backend가 import하는 `convert_to_gloss()` 시그니처를 유지하면서
+실제 구현체만 환경변수로 교체한다.
+
+기본값은 local(Ollama)이다. 기존 Gemini 구현도 rollback/비교 테스트용으로
+남겨 두되, 프론트/DB/Job Pipeline의 계약은 변경하지 않는다.
+"""
 
 import json
 import os
 
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+
+from services.local_llm_gloss_service import (
+    LocalGlossConversionError,
+    convert_to_gloss_local,
+)
 
 load_dotenv()
 
-_MODEL_NAME = "gemini-flash-lite-latest"
+_PROVIDER = os.environ.get("KSL_GLOSS_PROVIDER", "local").strip().lower()
+_GEMINI_MODEL_NAME = os.environ.get("GEMINI_GLOSS_MODEL", "gemini-flash-lite-latest")
 
 
 class GlossConversionError(Exception):
-    """Gemini API 호출 또는 응답 처리 과정에서 변환에 실패했을 때 발생하는 예외.
+    """Gloss 변환 provider 호출 또는 응답 처리 실패."""
 
-    - API 호출 자체가 실패한 경우 (네트워크 오류, 인증 오류, API 키 없음 등)
-    - 응답은 받았지만 JSON 형식이 아니거나 파싱에 실패한 경우
-    둘 다 이 예외로 표현하되, 메시지로 원인을 구분한다.
+
+def _convert_to_gloss_gemini(korean_text: str) -> list[str]:
+    """기존 Gemini 경로.
+
+    기본 실행 경로는 아니며, local 구현 비교/긴급 rollback을 위해 보존한다.
+    google-genai import도 여기서 지연시켜 local 모드가 Gemini 초기화에 의존하지 않게 한다.
     """
+    try:
+        from google import genai
+        from google.genai import types
+    except ImportError as exc:
+        raise GlossConversionError(
+            "Gemini provider를 사용하려면 google-genai가 필요합니다."
+        ) from exc
 
-
-def convert_to_gloss(korean_text: str) -> list[str]:
-    """한국어 문장을 Gemini API를 통해 KSL Gloss 배열로 변환한다.
-
-    Args:
-        korean_text: 변환할 한국어 문장.
-
-    Returns:
-        Gloss 문자열 리스트. 변환할 Gloss가 없는 정상 응답의 경우 빈 리스트를 반환한다.
-
-    Raises:
-        GlossConversionError: Gemini API 호출 자체가 실패했거나,
-            응답을 JSON 형식의 문자열 배열로 파싱하지 못한 경우.
-    """
-    # TODO: 프롬프트는 더미. 팀원이 규칙 확정하면 교체 예정.
     prompt = (
-        "다음 한국어 문장을 한국수어(KSL) Gloss 배열로 변환해서 "
-        "JSON 배열 형식으로만 답하세요. 다른 설명은 붙이지 마세요. "
-        f"문장: {korean_text}"
+        "Convert the following Korean sentence into a compact KSL gloss sequence. "
+        "Return exactly one JSON array of strings. Do not output WORD/SEN IDs, "
+        "explanations, Markdown, or extra fields. Preserve negation, questions, "
+        "requests, time, quantity, and subject/object relations when meaningful. "
+        "Do not invent information. Prefer short dictionary-like Korean gloss labels.\n"
+        f"sentence: {korean_text}"
     )
 
     try:
         client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
         response = client.models.generate_content(
-            model=_MODEL_NAME,
+            model=_GEMINI_MODEL_NAME,
             contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-            ),
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
         )
-    except Exception as e:
-        # 네트워크 오류, 인증 오류, API 키 없음, 잘못된 모델 이름 등
-        # API 호출 자체의 실패는 모두 여기서 GlossConversionError로 변환한다.
-        raise GlossConversionError(f"Gemini API 호출 실패: {e}") from e
+    except Exception as exc:
+        raise GlossConversionError(f"Gemini API 호출 실패: {exc}") from exc
 
     raw_text = response.text
-    if raw_text is None:
-        raise GlossConversionError("Gemini API 호출 실패: 응답 본문이 비어 있음")
+    if not isinstance(raw_text, str) or not raw_text.strip():
+        raise GlossConversionError("Gemini 응답 본문이 비어 있습니다.")
 
     try:
         gloss_list = json.loads(raw_text)
-    except json.JSONDecodeError as e:
-        raise GlossConversionError(f"응답 파싱 실패: JSON이 아닌 응답입니다 ({e})") from e
+    except json.JSONDecodeError as exc:
+        raise GlossConversionError(f"Gemini 응답 JSON 파싱 실패: {exc}") from exc
 
     if not isinstance(gloss_list, list) or not all(
         isinstance(item, str) for item in gloss_list
     ):
-        raise GlossConversionError(
-            f"응답 파싱 실패: 문자열 배열이 아닙니다 (raw={raw_text!r})"
-        )
+        raise GlossConversionError("Gemini 응답이 문자열 배열이 아닙니다.")
 
-    # 정상 응답이지만 변환할 Gloss가 없는 경우 -> 빈 리스트를 그대로 반환 (실패 아님)
-    return gloss_list
+    return [item.strip() for item in gloss_list if item.strip()]
+
+
+def convert_to_gloss(korean_text: str) -> list[str]:
+    """한국어 문자열을 기존 Pipeline 계약인 Gloss 문자열 배열로 변환한다."""
+    if not isinstance(korean_text, str):
+        raise GlossConversionError("korean_text는 문자열이어야 합니다.")
+
+    if not korean_text.strip():
+        return []
+
+    if _PROVIDER == "local":
+        try:
+            return convert_to_gloss_local(korean_text)
+        except LocalGlossConversionError as exc:
+            raise GlossConversionError(f"Local LLM Gloss 변환 실패: {exc}") from exc
+
+    if _PROVIDER == "gemini":
+        return _convert_to_gloss_gemini(korean_text)
+
+    raise GlossConversionError(
+        f"지원하지 않는 KSL_GLOSS_PROVIDER={_PROVIDER!r}. local 또는 gemini를 사용하세요."
+    )
