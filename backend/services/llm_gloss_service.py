@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 
 from services.local_llm_gloss_service import (
     LocalGlossConversionError,
+    LocalGlossValidationError,
     convert_to_gloss_local,
 )
 
@@ -25,6 +26,10 @@ _GEMINI_MODEL_NAME = os.environ.get("GEMINI_GLOSS_MODEL", "gemini-flash-lite-lat
 
 class GlossConversionError(Exception):
     """Gloss 변환 provider 호출 또는 응답 처리 실패."""
+
+
+class GlossValidationError(GlossConversionError):
+    """Generated gloss failed validation, distinct from provider outages."""
 
 
 def _convert_to_gloss_gemini(korean_text: str) -> list[str]:
@@ -88,6 +93,8 @@ def convert_to_gloss(korean_text: str) -> list[str]:
     if _PROVIDER == "local":
         try:
             return convert_to_gloss_local(korean_text)
+        except LocalGlossValidationError as exc:
+            raise GlossValidationError(str(exc)) from exc
         except LocalGlossConversionError as exc:
             raise GlossConversionError(f"Local LLM Gloss 변환 실패: {exc}") from exc
 

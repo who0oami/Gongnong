@@ -37,6 +37,19 @@ class LocalGlossServiceTest(unittest.TestCase):
         with self.assertRaises(LocalGlossConversionError):
             _extract_gloss_list(payload)
 
+    def test_rejects_foreign_output_without_silently_dropping_it(self):
+        for token in ["deputy", "quirky", "拿다", "WORD0001", "帶來다"]:
+            with self.subTest(token=token), self.assertRaises(LocalGlossConversionError):
+                _extract_gloss_list({"message": {"content": json.dumps(["아래", token])}})
+
+    def test_preserves_korean_names_negation_and_quantities(self):
+        tokens = ["민수", "부싯돌", "아래", "않다", "못 하다", "3개", "3.5", "1/2"]
+        self.assertEqual(_extract_gloss_list({"message": {"content": json.dumps(tokens)}}), tokens)
+
+    def test_rejects_non_object_ollama_payload(self):
+        with self.assertRaises(LocalGlossConversionError):
+            _extract_gloss_list([])
+
     @patch("services.local_llm_gloss_service.request.urlopen")
     def test_local_request_contract(self, mock_urlopen):
         mock_urlopen.return_value = _FakeResponse(

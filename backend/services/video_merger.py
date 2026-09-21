@@ -1,9 +1,13 @@
 import itertools
+import os
+import shutil
+import textwrap
 import subprocess
 import tempfile
 from pathlib import Path
 
 from services.clip_resolver import VIDEOS_DIR, resolve_clip_path
+from services.gloss_output_validation import _modalities
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "static" / "results"
 IDLE_IMAGE_PATH = Path(__file__).resolve().parent.parent / "static" / "images" / "idle_pose.png"
@@ -19,11 +23,12 @@ MISSING_CLIP_FALLBACK_SECONDS = 1.0
 _GAP_EPSILON = 1e-3
 
 
-def _run_ffmpeg(args: list[str]) -> None:
+def _run_ffmpeg(args: list[str], cwd: Path | None = None) -> None:
     result = subprocess.run(
         ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *args],
         capture_output=True,
         text=True,
+        cwd=cwd,
     )
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg failed: {' '.join(args)}\n{result.stderr}")
@@ -58,6 +63,46 @@ def _make_idle_pose(tmp: Path, duration: float, idx: int) -> Path:
         "-vf", vf, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
         str(out),
     ])
+    return out
+
+
+def _caption_font() -> Path:
+    configured = os.environ.get("KSL_CAPTION_FONT")
+    candidates = [Path(configured)] if configured else [
+        Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts/malgun.ttf",
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+        Path("/usr/share/fonts/truetype/nanum/NanumGothic.ttf"),
+        Path("/System/Library/Fonts/AppleSDGothicNeo.ttc"),
+    ]
+    for font in candidates:
+        if font.is_file():
+            return font
+    raise RuntimeError("한글 캡션 폰트가 없습니다. KSL_CAPTION_FONT에 한글 폰트 파일 경로를 지정하세요.")
+
+
+def _overlay_caption(tmp: Path, src: Path, text: str, idx: int) -> Path:
+    font = tmp / "caption-font.ttf"
+    if not font.exists():
+        shutil.copyfile(_caption_font(), font)
+    cleaned = " ".join(text.split())
+    fontsize = 48
+    while True:
+        lines = textwrap.wrap(cleaned, width=max(1, (WIDTH - 120) // fontsize))
+        if len(lines) * (fontsize + 12) <= HEIGHT // 2:
+            break
+        fontsize -= 2
+        if fontsize < 16:
+            raise ValueError("자막이 한 화면에 표시하기에 너무 깁니다. 자막 구간을 나누세요.")
+    textfile = tmp / f"caption_{idx}.txt"
+    textfile.write_text("\n".join(lines), encoding="utf-8")
+    out = tmp / f"caption_{idx}.mp4"
+    # Fixed relative filenames avoid filter escaping of Windows paths. Text is
+    # read as data; expansion=none prevents interpreting %{} or other syntax.
+    vf = (f"drawtext=fontfile={font.name}:textfile={textfile.name}:expansion=none:"
+          f"fontcolor=white:fontsize={fontsize}:line_spacing=12:box=1:"
+          "boxcolor=black@0.8:boxborderw=20:x=(w-tw)/2:y=h-th-60")
+    _run_ffmpeg(["-i", str(src.resolve()), "-vf", vf, "-an", "-c:v", "libx264",
+                 "-pix_fmt", "yuv420p", str(out.resolve())], cwd=tmp)
     return out
 
 
@@ -110,18 +155,36 @@ def merge_timeline_to_video(timeline: list[dict], output_filename: str) -> str:
         prev_end = 0.0
 
         for segment in timeline:
-            gap = segment["stt_start"] - prev_end
+            gap = segment.get("actual_start", segment["stt_start"]) - prev_end
             if gap > _GAP_EPSILON:
                 master_parts.append(_make_idle_pose(tmp, gap, next(counter)))
 
+            # Recheck availability at render time: a negation clip can disappear
+            # after planning. Do not render the remaining affirmative action.
+            clip_paths = {item["code"]: resolve_clip_path(item["code"])
+                          for item in segment["items"] if item["type"] == "avatar"}
+            missing_modality = any(
+                item["type"] == "avatar" and clip_paths[item["code"]] is None
+                and _modalities(item.get("gloss", "")) for item in segment["items"]
+            )
+            if missing_modality:
+                text = segment.get("caption_text") or " ".join(
+                    item.get("text", item.get("gloss", "")) for item in segment["items"])
+                duration = segment["actual_end"] - segment.get("actual_start", segment["stt_start"])
+                base = _make_idle_pose(tmp, duration, next(counter))
+                master_parts.append(_overlay_caption(tmp, base, text, next(counter)))
+                prev_end = segment["actual_end"]
+                continue
+            captions = [item["text"] for item in segment["items"] if item["type"] == "caption"]
             item_parts: list[Path] = []
             for item in segment["items"]:
                 if item["type"] != "avatar":
                     continue
 
-                clip_url = resolve_clip_path(item["code"])
+                clip_url = clip_paths[item["code"]]
                 if clip_url is None:
-                    item_parts.append(_make_idle_pose(tmp, MISSING_CLIP_FALLBACK_SECONDS, next(counter)))
+                    captions.append(item.get("gloss", item["code"]))
+                    item_parts.append(_make_idle_pose(tmp, item.get("duration", MISSING_CLIP_FALLBACK_SECONDS), next(counter)))
                 else:
                     src = VIDEOS_DIR / f"{item['code']}.mp4"
                     item_parts.append(_normalize_clip(tmp, src, next(counter)))
@@ -138,6 +201,8 @@ def merge_timeline_to_video(timeline: list[dict], output_filename: str) -> str:
 
             if trailing:
                 seg_final = _concat(tmp, trailing, next(counter)) if len(trailing) > 1 else trailing[0]
+                if captions:
+                    seg_final = _overlay_caption(tmp, seg_final, " ".join(captions), next(counter))
                 master_parts.append(seg_final)
 
             prev_end = segment["actual_end"]

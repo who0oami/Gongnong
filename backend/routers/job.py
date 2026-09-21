@@ -12,7 +12,8 @@ from services import job_repository
 from services.youtube_service import extract_video_id
 from services.subtitle_pipeline_service import get_corrected_transcript_data
 from services.demo_gloss_override import DEMO_GLOSS_OVERRIDE, build_display_sequence_from_codes
-from services.llm_gloss_service import convert_to_gloss, GlossConversionError
+from services.llm_gloss_service import convert_to_gloss, GlossConversionError, GlossValidationError
+from services.gloss_display_service import build_complete_display_sequence, caption_sequence
 from services.clip_resolver import resolve_clip_path, VIDEOS_DIR
 from services.timeline_builder import build_timeline
 from services.video_merger import merge_timeline_to_video, MISSING_CLIP_FALLBACK_SECONDS
@@ -89,7 +90,7 @@ async def process_job(job_id: str, url: str) -> None:
         )
 
         # KSL_CONVERTING: 시안 문장은 DEMO_GLOSS_OVERRIDE로 바로 대체하고,
-        # 그 외 문장만 실제 Gemini 호출로 gloss 변환한다.
+        # 그 외 문장은 설정된 provider로 변환하며 검증 실패는 원문 캡션으로 표시한다.
         job_repository.update_translation_job_db(db, job_id, status=JobStatus.KSL_CONVERTING)
 
         timeline_segments: list[dict] = []
@@ -102,6 +103,7 @@ async def process_job(job_id: str, url: str) -> None:
                     "start": seg.start,
                     "end": seg.end,
                     "display_sequence": build_display_sequence_from_codes(override_codes),
+                    "caption_text": seg.corrected_text or seg.source_text,
                 })
                 continue
 
@@ -110,6 +112,13 @@ async def process_job(job_id: str, url: str) -> None:
                     convert_to_gloss,
                     seg.corrected_text or seg.source_text,
                 )
+            except GlossValidationError:
+                timeline_segments.append({
+                    "start": seg.start, "end": seg.end,
+                    "display_sequence": caption_sequence(seg.corrected_text or seg.source_text),
+                    "caption_text": seg.corrected_text or seg.source_text,
+                })
+                continue
             except GlossConversionError as e:
                 job_repository.update_translation_job_db(
                     db,
@@ -124,11 +133,11 @@ async def process_job(job_id: str, url: str) -> None:
             timeline_segments.append({
                 "start": seg.start,
                 "end": seg.end,
-                "gloss_sequence": gloss_sequence,
+                "display_sequence": build_complete_display_sequence(seg.corrected_text or seg.source_text, gloss_sequence),
+                "caption_text": seg.corrected_text or seg.source_text,
             })
 
-        # SIGN_MAPPING: 실제 아바타 코드 매칭(gloss -> word/sen code)은
-        # build_timeline 내부에서 build_display_sequence를 통해 이뤄진다.
+        # SIGN_MAPPING: 위에서 만든 표시 시퀀스를 타임라인에 전달한다.
         job_repository.update_translation_job_db(db, job_id, status=JobStatus.SIGN_MAPPING)
 
         job_repository.update_translation_job_db(db, job_id, status=JobStatus.TIMELINE_BUILDING)

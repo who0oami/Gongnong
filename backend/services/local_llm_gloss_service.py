@@ -6,8 +6,14 @@ Gloss Matcher / Timeline / Frontend 코드는 변경할 필요가 없다.
 """
 
 import json
+import logging
 import os
+import re
+import time
 from urllib import error, request
+
+from services.gloss_clause_rules import source_grounded_glosses
+from services.gloss_output_validation import validation_issues, normalize_observed_forms
 
 _DEFAULT_BASE_URL = "http://127.0.0.1:11434"
 _DEFAULT_MODEL = "qwen2.5:3b"
@@ -44,6 +50,10 @@ class LocalGlossConversionError(Exception):
     """로컬 LLM 호출 또는 응답 파싱 실패."""
 
 
+class LocalGlossValidationError(LocalGlossConversionError):
+    """Generated content is unusable; callers may show the original subtitle."""
+
+
 def _ollama_url() -> str:
     base_url = os.environ.get("OLLAMA_BASE_URL", _DEFAULT_BASE_URL).rstrip("/")
     return f"{base_url}/api/chat"
@@ -55,20 +65,22 @@ def _model_name() -> str:
 
 def _extract_gloss_list(payload: dict) -> list[str]:
     """Ollama /api/chat 응답에서 JSON 문자열 배열을 엄격하게 검증한다."""
+    if not isinstance(payload, dict):
+        raise LocalGlossValidationError("Ollama 응답은 JSON 객체여야 합니다.")
     message = payload.get("message")
     if not isinstance(message, dict):
-        raise LocalGlossConversionError("로컬 LLM 응답에 message 객체가 없습니다.")
+        raise LocalGlossValidationError("로컬 LLM 응답에 message 객체가 없습니다.")
 
     raw_text = message.get("content")
     if not isinstance(raw_text, str) or not raw_text.strip():
-        raise LocalGlossConversionError("로컬 LLM 응답 본문이 비어 있습니다.")
+        raise LocalGlossValidationError("로컬 LLM 응답 본문이 비어 있습니다.")
 
     # format=json이어도 작은 모델이 {"glosses": [...]} 형태를 만들 수 있어
     # 배열을 우선 계약으로 두되, 한 번의 안전한 호환 파싱만 허용한다.
     try:
         parsed = json.loads(raw_text)
     except json.JSONDecodeError as exc:
-        raise LocalGlossConversionError(
+        raise LocalGlossValidationError(
             f"로컬 LLM 응답이 JSON이 아닙니다: {exc}"
         ) from exc
 
@@ -76,10 +88,15 @@ def _extract_gloss_list(payload: dict) -> list[str]:
         parsed = parsed["glosses"]
 
     if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
-        raise LocalGlossConversionError("로컬 LLM 응답이 문자열 배열이 아닙니다.")
+        raise LocalGlossValidationError("로컬 LLM 응답이 문자열 배열이 아닙니다.")
 
     # 공백 gloss는 matcher에서 의미가 없으므로 제거하고 순서는 그대로 유지한다.
-    return [item.strip() for item in parsed if item.strip()]
+    glosses = [item.strip() for item in parsed if item.strip()]
+    # 외국어를 삭제/음역하면 의미 손실을 숨기므로 전체 응답을 실패 처리한다.
+    # 수량 표현(3개, 3.5, 1/2)은 유지한다. 이는 의미 정확성 검증이 아니다.
+    if any(not re.fullmatch(r"[가-힣ㄱ-ㅎㅏ-ㅣ0-9]+(?:[ ./:%+-][가-힣ㄱ-ㅎㅏ-ㅣ0-9]+)*", item) for item in glosses):
+        raise LocalGlossValidationError("Gloss에 허용되지 않은 문자(외국어 또는 기호)가 포함되어 있습니다.")
+    return glosses
 
 
 def convert_to_gloss_local(korean_text: str) -> list[str]:
@@ -90,6 +107,10 @@ def convert_to_gloss_local(korean_text: str) -> list[str]:
     korean_text = korean_text.strip()
     if not korean_text:
         return []
+
+    protected = source_grounded_glosses(korean_text)
+    if protected is not None and not validation_issues(korean_text, protected):
+        return protected
 
     body = {
         "model": _model_name(),
@@ -114,6 +135,33 @@ def convert_to_gloss_local(korean_text: str) -> list[str]:
         ],
     }
 
+    deadline = time.monotonic() + _TIMEOUT_SECONDS
+    for attempt in range(2):
+        # Transport/server failures are not generation defects: do not retry them.
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise LocalGlossConversionError("로컬 LLM 호출 시간 예산을 초과했습니다.")
+        payload = _request_payload(body, timeout=remaining)
+        try:
+            glosses = normalize_observed_forms(korean_text, _extract_gloss_list(payload))
+            issues = validation_issues(korean_text, glosses)
+            if issues:
+                raise LocalGlossValidationError("Gloss 의미 보존 검증 실패: " + ", ".join(issues))
+            return glosses
+        except LocalGlossValidationError as exc:
+            if attempt == 1:
+                raise LocalGlossValidationError("재생성 후에도 검증 실패: " + str(exc)) from exc
+            logging.getLogger(__name__).info("Gloss 검증 실패로 1회 재생성")
+            body["messages"].append({"role": "user", "content": (
+                "앞선 출력은 검증에 실패했습니다. 원문에서 다시 변환하세요. 방향과 수량을 그대로 유지하고, "
+                "부정/금지는 대상 동작 바로 뒤에 놓으세요. 필요 없음은 '필요 없다', 금지는 '금지', "
+                "허락은 '허락'으로 표현하세요. '와다/해다/돼다/하지마다' 같은 잘못된 사전형과 "
+                "영어/한자를 쓰지 마세요. 없는 뜻을 추가하지 마세요. JSON glosses만 반환하세요. "
+                "검증 오류: " + str(exc)
+            )})
+
+
+def _request_payload(body: dict, timeout: float = _TIMEOUT_SECONDS) -> dict:
     http_request = request.Request(
         _ollama_url(),
         data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
@@ -122,7 +170,7 @@ def convert_to_gloss_local(korean_text: str) -> list[str]:
     )
 
     try:
-        with request.urlopen(http_request, timeout=_TIMEOUT_SECONDS) as response:
+        with request.urlopen(http_request, timeout=timeout) as response:
             response_body = response.read().decode("utf-8")
     except error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
@@ -145,4 +193,4 @@ def convert_to_gloss_local(korean_text: str) -> list[str]:
     if isinstance(payload, dict) and payload.get("error"):
         raise LocalGlossConversionError(f"Ollama 오류: {payload['error']}")
 
-    return _extract_gloss_list(payload)
+    return payload

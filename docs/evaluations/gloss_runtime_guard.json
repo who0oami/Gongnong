@@ -1,0 +1,35 @@
+[
+  {
+    "input": "오늘 비가 와요.",
+    "glosses": [
+      "오늘",
+      "비",
+      "와다"
+    ]
+  },
+  {
+    "input": "나는 커피를 마시지 않아요.",
+    "glosses": [
+      "나",
+      "커피",
+      "마시다",
+      "않다"
+    ]
+  },
+  {
+    "input": "이 나무 구멍 아래로 들어가면",
+    "error": "Gloss 의미 보존 검증 실패: direction_changed"
+  },
+  {
+    "input": "문을 열지 말고 창문을 닫으세요.",
+    "error": "Gloss 의미 보존 검증 실패: modality_changed, unverified_negation_scope"
+  },
+  {
+    "input": "상자를 지키고 있지만 겁먹을 필요는 없어요.",
+    "error": "Gloss 의미 보존 검증 실패: modality_changed, unverified_negation_scope"
+  },
+  {
+    "input": "내일 사과 3개를 가져와도 돼요.",
+    "error": "Gloss 의미 보존 검증 실패: quantity_changed, modality_changed"
+  }
+]
