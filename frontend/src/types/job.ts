@@ -20,8 +20,16 @@ export interface ConvertJob {
   progress?: number; // 0-100
   resultVideoUrl?: string;
   subtitleUrl?: string;
-  // TODO: unconfirmed — backend may return segments instead of (or alongside) subtitleUrl.
+
+  // TODO: backend segment structure will be aligned in a later task.
   segments?: ConvertJobSegment[];
-  createdAt: string;
+
+  // Backend Job API does not currently expose timestamps.
+  createdAt?: string;
   updatedAt?: string;
+
+  // Backend failure information.
+  failedStage?: string;
+  errorCode?: string;
+  errorMessage?: string;
 }

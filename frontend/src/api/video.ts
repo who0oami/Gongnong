@@ -5,12 +5,74 @@ export interface StartConvertRequest {
   sourceUrl: string;
 }
 
-// TODO: endpoint paths are placeholders pending the backend API spec. Whether job status is
-// delivered via polling, SSE, or WebSocket is also undecided — getJobStatus below assumes simple
-// polling (see the useConvertJob hook) and can be swapped out once that's settled. Also unconfirmed:
-// - startConvert payload beyond sourceUrl (e.g. target layout/quality options)
-// - ConvertJob field names/units returned by getJobStatus (see types/job.ts TODOs, incl. segments)
+type BackendJobStatus =
+  | "QUEUED"
+  | "TRANSCRIPTING"
+  | "KSL_CONVERTING"
+  | "SIGN_MAPPING"
+  | "TIMELINE_BUILDING"
+  | "COMPLETED"
+  | "FAILED";
+
+interface BackendJobResult {
+  video_url?: string | null;
+}
+
+interface BackendJobResponse {
+  job_id: string;
+  status: BackendJobStatus;
+  url: string;
+  result?: BackendJobResult | null;
+  failed_stage?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
+}
+
+function mapJobStatus(status: BackendJobStatus): ConvertJob["status"] {
+  switch (status) {
+    case "QUEUED":
+      return "pending";
+
+    case "TRANSCRIPTING":
+    case "KSL_CONVERTING":
+    case "SIGN_MAPPING":
+    case "TIMELINE_BUILDING":
+      return "processing";
+
+    case "COMPLETED":
+      return "completed";
+
+    case "FAILED":
+      return "failed";
+  }
+}
+
+function mapBackendJob(job: BackendJobResponse): ConvertJob {
+  return {
+    jobId: job.job_id,
+    sourceUrl: job.url,
+    status: mapJobStatus(job.status),
+    resultVideoUrl: job.result?.video_url ?? undefined,
+    failedStage: job.failed_stage ?? undefined,
+    errorCode: job.error_code ?? undefined,
+    errorMessage: job.error_message ?? undefined,
+  };
+}
+
 export const videoApi = {
-  startConvert: (payload: StartConvertRequest) => apiClient.post<ConvertJob>("/videos/convert", payload),
-  getJobStatus: (jobId: string) => apiClient.get<ConvertJob>(`/videos/convert/${jobId}`),
+  startConvert: async (payload: StartConvertRequest): Promise<ConvertJob> => {
+    const job = await apiClient.post<BackendJobResponse>("/translate/jobs", {
+      url: payload.sourceUrl,
+    });
+
+    return mapBackendJob(job);
+  },
+
+  getJobStatus: async (jobId: string): Promise<ConvertJob> => {
+    const job = await apiClient.get<BackendJobResponse>(
+      `/translate/jobs/${jobId}`,
+    );
+
+    return mapBackendJob(job);
+  },
 };
