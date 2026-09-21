@@ -12,12 +12,14 @@ from services import job_repository
 from services.youtube_service import extract_video_id
 from services.subtitle_pipeline_service import get_corrected_transcript_data
 from services.demo_gloss_override import DEMO_GLOSS_OVERRIDE, build_display_sequence_from_codes
-from services.llm_gloss_service import convert_to_gloss, GlossConversionError
+from services.ksl_converter import KSLConversionError, KSLConverter
+from services.llm_gloss_service import GeminiKSLConverter
 from services.clip_resolver import resolve_clip_path, VIDEOS_DIR
 from services.timeline_builder import build_timeline
 from services.video_merger import merge_timeline_to_video, MISSING_CLIP_FALLBACK_SECONDS
 
 router = APIRouter()
+ksl_converter: KSLConverter = GeminiKSLConverter()
 
 
 def _get_clip_duration(code: str) -> float:
@@ -107,10 +109,10 @@ async def process_job(job_id: str, url: str) -> None:
 
             try:
                 gloss_sequence = await asyncio.to_thread(
-                    convert_to_gloss,
+                    ksl_converter.convert,
                     seg.corrected_text or seg.source_text,
                 )
-            except GlossConversionError as e:
+            except KSLConversionError as e:
                 job_repository.update_translation_job_db(
                     db,
                     job_id,

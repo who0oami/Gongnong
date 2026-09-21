@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+from services.ksl_converter import KSLConversionError
+
 load_dotenv()
 
 _MODEL_NAME = "gemini-flash-lite-latest"
@@ -75,3 +77,14 @@ def convert_to_gloss(korean_text: str) -> list[str]:
 
     # 정상 응답이지만 변환할 Gloss가 없는 경우 -> 빈 리스트를 그대로 반환 (실패 아님)
     return gloss_list
+
+
+class GeminiKSLConverter:
+    """기존 Gemini 변환 함수를 KSLConverter 공통 계약에 연결한다."""
+
+    def convert(self, korean_text: str) -> list[str]:
+        """Gloss 리스트를 반환하고 변환 실패를 공통 예외로 전달한다."""
+        try:
+            return convert_to_gloss(korean_text)
+        except GlossConversionError as exc:
+            raise KSLConversionError(str(exc)) from exc
