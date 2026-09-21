@@ -47,12 +47,42 @@ function mapJobStatus(status: BackendJobStatus): ConvertJob["status"] {
   }
 }
 
+function mapJobProgress(status: BackendJobStatus): number {
+  switch (status) {
+    case "QUEUED":
+      return 5;
+    case "TRANSCRIPTING":
+      return 25;
+    case "KSL_CONVERTING":
+      return 50;
+    case "SIGN_MAPPING":
+      return 70;
+    case "TIMELINE_BUILDING":
+      return 85;
+    case "COMPLETED":
+      return 100;
+    case "FAILED":
+      return 0;
+  }
+}
+
+function resolveVideoUrl(videoUrl?: string | null): string | undefined {
+  if (!videoUrl) return undefined;
+  if (/^https?:\/\//i.test(videoUrl)) return videoUrl;
+
+  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
+  if (!baseUrl) return videoUrl;
+
+  return `${baseUrl.replace(/\/+$/, "")}/${videoUrl.replace(/^\/+/, "")}`;
+}
+
 function mapBackendJob(job: BackendJobResponse): ConvertJob {
   return {
     jobId: job.job_id,
     sourceUrl: job.url,
     status: mapJobStatus(job.status),
-    resultVideoUrl: job.result?.video_url ?? undefined,
+    progress: mapJobProgress(job.status),
+    resultVideoUrl: resolveVideoUrl(job.result?.video_url),
     failedStage: job.failed_stage ?? undefined,
     errorCode: job.error_code ?? undefined,
     errorMessage: job.error_message ?? undefined,
