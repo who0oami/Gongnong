@@ -63,6 +63,7 @@ export default function ProcessingPage() {
   const progress = job?.status === "completed" ? 100 : Math.min(job?.progress ?? 0, 99);
   const procStep = Math.min(MOCK_PROC_STEPS.length - 1, Math.floor((progress / 100) * MOCK_PROC_STEPS.length));
   const failed = job?.status === "failed" || !!error;
+  const failureMessage = error ?? job?.errorMessage ?? "변환에 실패했습니다.";
 
   const etaLabel = failed
     ? "변환에 실패했습니다"
@@ -108,7 +109,7 @@ export default function ProcessingPage() {
                 />
               </div>
               <p style={{ fontSize: "12px", color: failed ? "#EF4444" : "#747C78", margin: "8px 0 0" }}>{etaLabel}</p>
-              {error && <ErrorState message={error} />}
+              {failed && <ErrorState message={failureMessage} />}
             </div>
             {!failed && (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
