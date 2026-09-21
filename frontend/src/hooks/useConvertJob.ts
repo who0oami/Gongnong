@@ -27,7 +27,7 @@ export function useConvertJob() {
         try {
           const latest = await videoApi.getJobStatus(jobId);
           setJob(latest);
-          if (latest.status === "completed" || latest.status === "failed") {
+          if (latest.status === "COMPLETED" || latest.status === "FAILED") {
             stopPolling();
           }
         } catch (err) {
@@ -43,10 +43,10 @@ export function useConvertJob() {
     async (sourceUrl: string) => {
       setError(null);
       try {
-        const created = await videoApi.startConvert({ sourceUrl });
+        const created = await videoApi.startConvert({ url: sourceUrl });
         setJob(created);
-        sessionStorage.setItem(JOB_ID_KEY, created.jobId);
-        poll(created.jobId);
+        sessionStorage.setItem(JOB_ID_KEY, created.job_id);
+        poll(created.job_id);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "변환 요청에 실패했습니다.");
       }
@@ -62,7 +62,7 @@ export function useConvertJob() {
     try {
       const latest = await videoApi.getJobStatus(jobId);
       setJob(latest);
-      if (latest.status !== "completed" && latest.status !== "failed") {
+      if (latest.status !== "COMPLETED" && latest.status !== "FAILED") {
         poll(jobId);
       }
       return true;

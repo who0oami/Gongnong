@@ -1,3 +1,5 @@
+import type { ConvertJobStatus } from "../types";
+
 export function vidId(u: string): string | null {
   const m = (u || "").match(/(?:v=|youtu\.be\/)([^&?/]+)/);
   return m ? m[1] : null;
@@ -21,4 +23,36 @@ export function fmtWatch(secs: number): string {
 
 export function fmtTime(n: number): string {
   return Math.floor(n / 60) + ":" + String(Math.floor(n % 60)).padStart(2, "0");
+}
+
+// The backend's Job response has no numeric progress field (see backend/schemas/job.py) — only the
+// 7-stage status string. This is a fixed approximation for the progress bar, not a measured value.
+const STATUS_PROGRESS: Record<ConvertJobStatus, number> = {
+  QUEUED: 0,
+  TRANSCRIPTING: 20,
+  KSL_CONVERTING: 40,
+  SIGN_MAPPING: 60,
+  TIMELINE_BUILDING: 80,
+  COMPLETED: 100,
+  FAILED: 0,
+};
+
+export function progressForStatus(status: ConvertJobStatus): number {
+  return STATUS_PROGRESS[status];
+}
+
+// Index into MOCK_PROC_STEPS (src/mocks/processingSteps.ts) — its 5 labeled steps line up 1:1 with
+// the 5 pre-completion pipeline stages.
+const STATUS_STEP_INDEX: Record<ConvertJobStatus, number> = {
+  QUEUED: 0,
+  TRANSCRIPTING: 1,
+  KSL_CONVERTING: 2,
+  SIGN_MAPPING: 3,
+  TIMELINE_BUILDING: 4,
+  COMPLETED: 4,
+  FAILED: 0,
+};
+
+export function stepIndexForStatus(status: ConvertJobStatus): number {
+  return STATUS_STEP_INDEX[status];
 }

@@ -1,27 +1,40 @@
-export type ConvertJobStatus = "pending" | "processing" | "completed" | "failed";
+// Mirrors backend/schemas/job.py's JobStatus exactly (values, not the order they're declared in) —
+// this is what GET/POST /translate/jobs actually returns, no frontend-side renaming.
+export type ConvertJobStatus =
+  | "QUEUED"
+  | "TRANSCRIPTING"
+  | "KSL_CONVERTING"
+  | "SIGN_MAPPING"
+  | "TIMELINE_BUILDING"
+  | "COMPLETED"
+  | "FAILED";
 
-// One recognized sign-language unit within a completed job's result, timed against resultVideoUrl.
-// TODO: confirm this shape with the backend team — field names (gloss vs label/token) and whether
-// confidence is 0-1 or 0-100 are unconfirmed; PlayerPage's low-confidence banner (mocks/subtitles.ts)
-// will read `confidence` once this is wired to a real job response.
+// Mirrors backend/schemas/job.py's JobSegment.
 export interface ConvertJobSegment {
-  start: number; // seconds, relative to resultVideoUrl
+  start: number; // seconds
   end: number;
-  gloss: string;
-  confidence: number;
+  source_text: string;
+  corrected_text?: string | null;
+  ksl_text?: string | null;
 }
 
-// Shape of a video-to-sign-language conversion job.
-// TODO: confirm field names, progress semantics, and subtitle delivery format (URL vs inline list) with the backend team.
+// Mirrors backend/schemas/job.py's JobResult — video_url is the sign-language avatar video;
+// there's no separate field for the original source video (PlayerPage plays that straight from
+// the job's own `url`/the YouTube link, never from a backend-hosted copy).
+export interface ConvertJobResult {
+  transcript: string;
+  segments: ConvertJobSegment[];
+  video_url: string | null;
+}
+
+// Mirrors backend/schemas/job.py's Job — the exact shape returned by both
+// POST /translate/jobs and GET /translate/jobs/{job_id}.
 export interface ConvertJob {
-  jobId: string;
-  sourceUrl: string;
+  job_id: string;
   status: ConvertJobStatus;
-  progress?: number; // 0-100
-  resultVideoUrl?: string;
-  subtitleUrl?: string;
-  // TODO: unconfirmed — backend may return segments instead of (or alongside) subtitleUrl.
-  segments?: ConvertJobSegment[];
-  createdAt: string;
-  updatedAt?: string;
+  url: string;
+  result: ConvertJobResult | null;
+  failed_stage: string | null;
+  error_code: string | null;
+  error_message: string | null;
 }

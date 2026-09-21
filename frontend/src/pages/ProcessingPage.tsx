@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useVideo } from "../state/VideoContext";
 import { useConvertJob } from "../hooks/useConvertJob";
-import { thumbOf, vidId } from "../utils/video";
+import { progressForStatus, stepIndexForStatus, thumbOf, vidId } from "../utils/video";
 import { MOCK_PROC_STEPS, MOCK_PROC_TOTAL } from "../mocks/processingSteps";
 import ErrorState from "../components/common/ErrorState";
 import Loading from "../components/common/Loading";
@@ -30,19 +30,20 @@ export default function ProcessingPage() {
   }, [currentUrl, retryTick]);
 
   useEffect(() => {
-    if (job?.status === "completed" && !navigatedRef.current) {
+    if (job?.status === "COMPLETED" && !navigatedRef.current) {
       navigatedRef.current = true;
       window.setTimeout(() => {
         setCurrentJob(job);
         addHistoryItem({
-          id: job.jobId,
+          id: job.job_id,
           title: vidId(currentUrl) ? `YouTube 영상 (${vidId(currentUrl)})` : "유튜브 영상",
           url: currentUrl,
           date: new Date().toISOString().slice(0, 10),
           status: "완료",
-          duration: "3:42", // TODO: use the real source duration once the backend returns it on the job.
-          resultVideoUrl: job.resultVideoUrl,
-          subtitleUrl: job.subtitleUrl,
+          // TODO: nothing on the job response carries a duration yet (videos.duration_ms isn't
+          // populated by the pipeline) — 0:00 until the backend actually returns one.
+          duration: "0:00",
+          resultVideoUrl: job.result?.video_url ?? undefined,
         });
         navigate("/player");
       }, 500);
@@ -56,9 +57,10 @@ export default function ProcessingPage() {
     setRetryTick((t) => t + 1);
   }
 
-  const progress = job?.status === "completed" ? 100 : Math.min(job?.progress ?? 0, 99);
-  const procStep = Math.min(MOCK_PROC_STEPS.length - 1, Math.floor((progress / 100) * MOCK_PROC_STEPS.length));
-  const failed = job?.status === "failed" || !!error;
+  const progress = job ? progressForStatus(job.status) : 0;
+  const procStep = job ? stepIndexForStatus(job.status) : 0;
+  const failed = job?.status === "FAILED" || !!error;
+  const failureMessage = job?.error_message ?? error;
 
   const etaLabel = failed
     ? "변환에 실패했습니다"
@@ -104,7 +106,7 @@ export default function ProcessingPage() {
                 />
               </div>
               <p style={{ fontSize: "12px", color: failed ? "#EF4444" : "#747C78", margin: "8px 0 0" }}>{etaLabel}</p>
-              {error && <ErrorState message={error} />}
+              {failed && failureMessage && <ErrorState message={failureMessage} />}
             </div>
             {!failed && (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
