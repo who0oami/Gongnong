@@ -10,27 +10,32 @@ import logo from "../assets/logo.png";
 
 export default function ProcessingPage() {
   const navigate = useNavigate();
-  const { currentUrl, addHistoryItem, setCurrentJob } = useVideo();
+  const { currentUrl, setCurrentUrl, addHistoryItem, setCurrentJob } = useVideo();
   const { job, error, start, resume } = useConvertJob();
   const startedRef = useRef(false);
   const navigatedRef = useRef(false);
-  const [retryTick, setRetryTick] = useState(0);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    if (!currentUrl) {
-      navigate("/home");
-      return;
-    }
     if (startedRef.current) return;
     startedRef.current = true;
-    resume().then((resumed) => {
-      if (!resumed) start(currentUrl);
+    resume().then(async (resumed) => {
+      const terminal = resumed?.status === "completed" || resumed?.status === "failed";
+      if (resumed && !(currentUrl && terminal)) {
+        setCurrentUrl(resumed.sourceUrl);
+      } else if (currentUrl) {
+        await start(currentUrl);
+      } else {
+        navigate("/home");
+        return;
+      }
+      setInitialized(true);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUrl, retryTick]);
+  }, [currentUrl]);
 
   useEffect(() => {
-    if (job?.status === "completed" && !navigatedRef.current) {
+    if (initialized && currentUrl && job?.status === "completed" && !navigatedRef.current) {
       navigatedRef.current = true;
       window.setTimeout(() => {
         setCurrentJob(job);
@@ -48,12 +53,11 @@ export default function ProcessingPage() {
       }, 500);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job]);
+  }, [job, currentUrl, initialized]);
 
   function retry() {
-    startedRef.current = false;
     navigatedRef.current = false;
-    setRetryTick((t) => t + 1);
+    void start(currentUrl);
   }
 
   const progress = job?.status === "completed" ? 100 : Math.min(job?.progress ?? 0, 99);

@@ -29,6 +29,7 @@ export function useConvertJob() {
           setJob(latest);
           if (latest.status === "completed" || latest.status === "failed") {
             stopPolling();
+            sessionStorage.removeItem(JOB_ID_KEY);
           }
         } catch (err) {
           setError(err instanceof ApiError ? err.message : "상태 조회에 실패했습니다.");
@@ -41,36 +42,45 @@ export function useConvertJob() {
 
   const start = useCallback(
     async (sourceUrl: string) => {
+      stopPolling();
+      sessionStorage.removeItem(JOB_ID_KEY);
+      setJob(null);
       setError(null);
       try {
         const created = await videoApi.startConvert({ sourceUrl });
         setJob(created);
-        sessionStorage.setItem(JOB_ID_KEY, created.jobId);
-        poll(created.jobId);
+        if (created.status !== "completed" && created.status !== "failed") {
+          sessionStorage.setItem(JOB_ID_KEY, created.jobId);
+          poll(created.jobId);
+        }
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "변환 요청에 실패했습니다.");
       }
     },
-    [poll],
+    [poll, stopPolling],
   );
 
   // Called once on ProcessingPage mount; resumes an in-flight job from storage, if any, instead of
-  // starting a duplicate one. Returns whether a job was actually resumed.
-  const resume = useCallback(async () => {
+  // starting a duplicate one. Returns the fetched job so its source URL can be restored.
+  const resume = useCallback(async (): Promise<ConvertJob | null> => {
+    stopPolling();
+    setError(null);
     const jobId = sessionStorage.getItem(JOB_ID_KEY);
-    if (!jobId) return false;
+    if (!jobId) return null;
     try {
       const latest = await videoApi.getJobStatus(jobId);
       setJob(latest);
       if (latest.status !== "completed" && latest.status !== "failed") {
         poll(jobId);
+      } else {
+        sessionStorage.removeItem(JOB_ID_KEY);
       }
-      return true;
+      return latest;
     } catch {
       sessionStorage.removeItem(JOB_ID_KEY);
-      return false;
+      return null;
     }
-  }, [poll]);
+  }, [poll, stopPolling]);
 
   const clear = useCallback(() => {
     stopPolling();
