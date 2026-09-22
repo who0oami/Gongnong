@@ -3,7 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from routers import youtube, job
+
+from routers import youtube, job, auth, history
+
 
 app = FastAPI()
 
@@ -20,6 +22,8 @@ app.add_middleware(
 
 app.include_router(youtube.router)
 app.include_router(job.router)
+app.include_router(auth.router)
+app.include_router(history.router)
 
 @app.get("/")
 def read_root():

@@ -28,7 +28,7 @@ class VideoCaptionTest(unittest.TestCase):
              patch.object(v,"_make_idle_pose",return_value=Path(folder)/"base.mp4") as idle, \
              patch.object(v,"_overlay_caption",return_value=Path(folder)/"caption.mp4") as overlay, \
              patch.object(v,"_concat"):
-            v.merge_timeline_to_video([segment],"result.mp4")
+            v.merge_timeline_to_video([segment],"result.mp4", {})
             self.assertEqual(idle.call_args.args[1],3)
             self.assertEqual(overlay.call_args.args[2],"열다 금지")
             self.assertEqual(idle.call_count,1)
@@ -39,12 +39,13 @@ class MixedRendererTest(unittest.TestCase):
         segment={"stt_start":0,"stt_end":3,"actual_start":0,"actual_end":3,"speed":1,"idle_duration":2,
                  "items":[{"type":"avatar","code":"A","gloss":"가다","duration":1}, {"type":"caption","text":"민수"}]}
         with tempfile.TemporaryDirectory() as folder, patch.object(v,"RESULTS_DIR",Path(folder)), \
-             patch.object(v,"resolve_clip_path",return_value="/static/videos/A.mp4"), \
              patch.object(v,"_normalize_clip",return_value=Path(folder)/"sign.mp4") as normalize, \
              patch.object(v,"_make_idle_pose",return_value=Path(folder)/"idle.mp4"), \
              patch.object(v,"_concat",return_value=Path(folder)/"joined.mp4"), \
              patch.object(v,"_overlay_caption",return_value=Path(folder)/"caption.mp4") as overlay:
-            v.merge_timeline_to_video([segment],"result.mp4")
+            clip = Path(folder) / "A.mp4"
+            clip.write_bytes(b"fixture")
+            v.merge_timeline_to_video([segment],"result.mp4", {"A": clip})
             normalize.assert_called_once()
             self.assertEqual(overlay.call_args.args[2],"민수")
 
@@ -56,11 +57,12 @@ class LateMissingModalityTest(unittest.TestCase):
                  {"type":"avatar","code":"A","gloss":"가다","duration":1},
                  {"type":"avatar","code":"B","gloss":"않다","duration":1}]}
         with tempfile.TemporaryDirectory() as folder, patch.object(v,"RESULTS_DIR",Path(folder)), \
-             patch.object(v,"resolve_clip_path",side_effect=lambda code: "/A.mp4" if code=="A" else None), \
              patch.object(v,"_normalize_clip") as normalize, \
              patch.object(v,"_make_idle_pose",return_value=Path(folder)/"idle.mp4"), \
              patch.object(v,"_concat"), \
              patch.object(v,"_overlay_caption",return_value=Path(folder)/"caption.mp4") as overlay:
-            v.merge_timeline_to_video([segment],"result.mp4")
+            clip = Path(folder) / "A.mp4"
+            clip.write_bytes(b"fixture")
+            v.merge_timeline_to_video([segment],"result.mp4", {"A": clip, "B": Path(folder) / "disappeared.mp4"})
             normalize.assert_not_called()
             self.assertEqual(overlay.call_args.args[2],"학교에 가지 않아요.")

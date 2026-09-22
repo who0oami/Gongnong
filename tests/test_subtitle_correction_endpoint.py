@@ -50,11 +50,15 @@ class SubtitleCorrectionEndpointTests(unittest.TestCase):
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
         self.forbidden = []
-        for name in ("process_job", "convert_to_gloss", "build_timeline",
+        for name in ("process_job", "build_timeline",
                      "resolve_clip_path", "_get_clip_duration", "merge_timeline_to_video"):
             self.forbidden.append(self.start_patch(patch.object(
                 job, name, side_effect=AssertionError(f"호출 금지: {name}"),
             )))
+        self.forbidden.append(self.start_patch(patch.object(
+            job.ksl_converter, "convert",
+            side_effect=AssertionError("호출 금지: ksl_converter.convert"),
+        )))
         for target in (
             "services.llm_gloss_service.convert_to_gloss",
             "services.timeline_builder.build_timeline",

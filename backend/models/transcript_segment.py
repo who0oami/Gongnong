@@ -13,7 +13,7 @@ class TranscriptSegment(Base):
         BigInteger, primary_key=True, autoincrement=True, nullable=False
     )
     translation_job_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("translation_jobs.id"), nullable=False
+        BigInteger, ForeignKey("translation_jobs.id", ondelete="CASCADE"), nullable=False
     )
     sequence_no: Mapped[int] = mapped_column(Integer, nullable=False)
     start_ms: Mapped[int] = mapped_column(Integer, nullable=False)

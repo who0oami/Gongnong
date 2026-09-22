@@ -18,13 +18,15 @@ from services.local_llm_gloss_service import (
     convert_to_gloss_local,
 )
 
+from services.ksl_converter import KSLConversionError
+
 load_dotenv()
 
 _PROVIDER = os.environ.get("KSL_GLOSS_PROVIDER", "local").strip().lower()
 _GEMINI_MODEL_NAME = os.environ.get("GEMINI_GLOSS_MODEL", "gemini-flash-lite-latest")
 
 
-class GlossConversionError(Exception):
+class GlossConversionError(KSLConversionError):
     """Gloss 변환 provider 호출 또는 응답 처리 실패."""
 
 
@@ -104,3 +106,11 @@ def convert_to_gloss(korean_text: str) -> list[str]:
     raise GlossConversionError(
         f"지원하지 않는 KSL_GLOSS_PROVIDER={_PROVIDER!r}. local 또는 gemini를 사용하세요."
     )
+
+
+class ConfiguredKSLConverter:
+    """설정된 provider(기본 Ollama)를 팀의 변환기 계약에 연결한다."""
+
+    def convert(self, korean_text: str) -> list[str]:
+        # 검증 실패의 하위 예외를 유지해야 Job이 원문 캡션으로 복구할 수 있다.
+        return convert_to_gloss(korean_text)

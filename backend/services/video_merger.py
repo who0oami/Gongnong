@@ -6,7 +6,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from services.clip_resolver import VIDEOS_DIR, resolve_clip_path
 from services.gloss_output_validation import _modalities
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "static" / "results"
@@ -14,10 +13,8 @@ IDLE_IMAGE_PATH = Path(__file__).resolve().parent.parent / "static" / "images" /
 
 WIDTH, HEIGHT, FPS = 1920, 1080, 30
 
-# ponytail: build_timeline()의 items에는 code만 있고 개별 클립의 재생 시간이
-# 없어서, 파일이 없는 avatar 항목을 얼마나 긴 검은 화면으로 대체해야 하는지
-# 알 방법이 없다. 실제 duration 메타데이터를 items에 싣거나 get_duration을
-# merge_timeline_to_video에도 전달하게 되면 이 고정값 대신 그 값을 쓰도록 교체.
+# 다운로드 실패로 실제 길이를 알 수 없을 때 계획에 사용하는 기본 시간.
+# 계획 후 파일이 사라졌다면 렌더러는 item의 측정된 duration을 유지한다.
 MISSING_CLIP_FALLBACK_SECONDS = 1.0
 
 _GAP_EPSILON = 1e-3
@@ -144,7 +141,9 @@ def _concat(tmp: Path, parts: list[Path], idx: int, out_path: Path | None = None
     return out
 
 
-def merge_timeline_to_video(timeline: list[dict], output_filename: str) -> str:
+def merge_timeline_to_video(
+    timeline: list[dict], output_filename: str, clip_paths: dict[str, Path | None],
+) -> str:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     output_path = RESULTS_DIR / output_filename
     counter = itertools.count()
@@ -161,10 +160,13 @@ def merge_timeline_to_video(timeline: list[dict], output_filename: str) -> str:
 
             # Recheck availability at render time: a negation clip can disappear
             # after planning. Do not render the remaining affirmative action.
-            clip_paths = {item["code"]: resolve_clip_path(item["code"])
-                          for item in segment["items"] if item["type"] == "avatar"}
+            available_paths = {}
+            for item in segment["items"]:
+                if item["type"] == "avatar":
+                    path = clip_paths.get(item["code"])
+                    available_paths[item["code"]] = path if path is not None and path.is_file() else None
             missing_modality = any(
-                item["type"] == "avatar" and clip_paths[item["code"]] is None
+                item["type"] == "avatar" and available_paths[item["code"]] is None
                 and _modalities(item.get("gloss", "")) for item in segment["items"]
             )
             if missing_modality:
@@ -181,12 +183,11 @@ def merge_timeline_to_video(timeline: list[dict], output_filename: str) -> str:
                 if item["type"] != "avatar":
                     continue
 
-                clip_url = clip_paths[item["code"]]
-                if clip_url is None:
+                src = available_paths[item["code"]]
+                if src is None:
                     captions.append(item.get("gloss", item["code"]))
                     item_parts.append(_make_idle_pose(tmp, item.get("duration", MISSING_CLIP_FALLBACK_SECONDS), next(counter)))
                 else:
-                    src = VIDEOS_DIR / f"{item['code']}.mp4"
                     item_parts.append(_normalize_clip(tmp, src, next(counter)))
 
             seg_base = None
@@ -216,42 +217,9 @@ def merge_timeline_to_video(timeline: list[dict], output_filename: str) -> str:
 
 
 if __name__ == "__main__":
-    import json
-    import subprocess as sp
+    from routers.job import _render_job_video
 
-    from services.timeline_builder import build_timeline
-
-    def get_duration(code: str) -> float:
-        clip_url = resolve_clip_path(code)
-        if clip_url is None:
-            return MISSING_CLIP_FALLBACK_SECONDS
-        probe = sp.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(VIDEOS_DIR / f"{code}.mp4")],
-            capture_output=True, text=True, check=True,
-        )
-        return float(probe.stdout.strip())
-
-    # "첫번째"(WORD0058)/"나"(WORD1157)는 static/videos/에 실제 파일이 있고,
-    # "고민"(WORD0001)은 매칭은 되지만 파일이 없는 케이스(검은 화면 대체 확인용).
-    stt_segments = [
+    print(_render_job_video("demo_result", [
         {"start": 0.5, "end": 6.0, "gloss_sequence": ["첫번째", "고민", "나"]},
         {"start": 7.0, "end": 9.0, "gloss_sequence": ["두번째"]},
-    ]
-
-    timeline = build_timeline(stt_segments, get_duration)
-    print(json.dumps(timeline, ensure_ascii=False, indent=2))
-
-    url = merge_timeline_to_video(timeline, "demo_result.mp4")
-    print("output url:", url)
-
-    output_path = RESULTS_DIR / "demo_result.mp4"
-    print("exists:", output_path.is_file())
-
-    probe = sp.run(
-        ["ffprobe", "-v", "error", "-show_entries",
-         "format=duration:stream=width,height,r_frame_rate,codec_name",
-         "-of", "json", str(output_path)],
-        capture_output=True, text=True, check=True,
-    )
-    print(probe.stdout)
+    ]))

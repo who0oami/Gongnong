@@ -5,23 +5,20 @@ from services.timeline_builder import build_timeline
 
 
 class CompleteDisplayTest(unittest.TestCase):
-    @patch("services.gloss_display_service.resolve_clip_path", return_value="/static/videos/A.mp4")
     @patch("services.gloss_display_service.build_display_sequence")
-    def test_missing_negation_keeps_full_source(self, match, resolve):
+    def test_missing_negation_keeps_full_source(self, match):
         match.return_value = [{"type":"avatar","gloss":"가다","code":"A"}, {"type":"caption","text":"않다"}]
         self.assertEqual(build_complete_display_sequence("학교에 가지 않아요.", ["가다","않다"]),
                          [{"type":"caption","text":"학교에 가지 않아요."}])
 
-    @patch("services.gloss_display_service.resolve_clip_path", return_value=None)
     @patch("services.gloss_display_service.build_display_sequence")
-    def test_missing_file_captions_only_that_item(self, match, resolve):
+    def test_download_is_deferred_until_after_mapping(self, match):
         match.return_value = [{"type":"avatar","gloss":"가다","code":"A"}]
         self.assertEqual(build_complete_display_sequence("학교에 가요.", ["가다"]),
-                         [{"type":"caption","text":"가다"}])
+                         [{"type":"avatar","gloss":"가다","code":"A"}])
 
-    @patch("services.gloss_display_service.resolve_clip_path", return_value="/static/videos/A.mp4")
     @patch("services.gloss_display_service.build_display_sequence")
-    def test_complete_sequence_stays_avatar(self, match, resolve):
+    def test_complete_sequence_stays_avatar(self, match):
         items = [{"type":"avatar","gloss":"가다","code":"A"}]
         match.return_value = items
         self.assertEqual(build_complete_display_sequence("가요", ["가다"]), items)
@@ -39,9 +36,8 @@ class CompleteDisplayTest(unittest.TestCase):
 
 
 class MixedItemsTest(unittest.TestCase):
-    @patch("services.gloss_display_service.resolve_clip_path", return_value="/static/videos/A.mp4")
     @patch("services.gloss_display_service.build_display_sequence")
-    def test_unknown_noun_does_not_remove_matched_sign(self, match, resolve):
+    def test_unknown_noun_does_not_remove_matched_sign(self, match):
         items = [{"type":"caption","text":"민수"}, {"type":"avatar","gloss":"가다","code":"A"}]
         match.return_value = items
         self.assertEqual(build_complete_display_sequence("민수가 가요.", ["민수","가다"]), items)
