@@ -146,7 +146,7 @@ aws s3api head-object --bucket ksl-tube-avatar-clips --key clips/word/WORD0001.m
 
 완성 영상은 `backend/static/results/{job_id}.mp4`에 남고 `/static/results/{job_id}.mp4`로 제공됩니다. 현재 결과 영상을 S3로 업로드하지 않습니다. S3 인증 오류나 없는 클립은 경고 후 누락 클립 처리로 넘어가므로 `COMPLETED`만으로 클립이 정상이라고 판단하지 말고 영상도 확인합니다.
 
-SEN 클립은 S3 경로 규칙이 아직 없어 `backend/static/videos/SENxxxx.mp4`를 확인합니다. 필요한 SEN 영상은 별도 전달받아야 합니다. 매핑용 `data/word3000_mapping.csv`, `data/sen_sentence_mapping.csv`, `data/감정단어_매핑결과_대체어포함.csv`는 저장소에 포함되어 있습니다. 원본 데이터셋·모델 가중치·클립 영상은 Git에 추가하지 않습니다.
+SEN 클립은 S3 경로 규칙이 아직 없어 `backend/static/videos/SENxxxx.mp4`를 확인합니다. 필요한 SEN 영상은 별도 전달받아야 합니다. 매핑용 `data/ALL_WORD_ID_MAPPING.csv`, `data/sen_sentence_mapping.csv`, `data/감정단어_매핑결과_대체어포함.csv`는 저장소에 포함되어 있습니다. 원본 데이터셋·모델 가중치·클립 영상은 Git에 추가하지 않습니다.
 
 ## 7. Backend / Frontend 실행
 
