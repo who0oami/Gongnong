@@ -32,6 +32,34 @@ def get_current_user(
     return user
 
 
+def get_current_user_optional(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """Only the "no credential offered" case is optional: no Authorization header (or a
+    non-Bearer one) resolves to None so POST /translate/jobs keeps working for anonymous callers
+    (see create_translation_job in routers/job.py). A Bearer token that IS present but invalid,
+    expired, or for a deleted user still raises 401, same as get_current_user — silently treating a
+    stale token as "anonymous" would let a logged-in user's job get saved with no owner without any
+    signal, so it'd quietly never show up in their GET /history."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+
+    token = authorization.split(" ", 1)[1]
+
+    try:
+        user_id = auth_service.decode_access_token(token)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="토큰이 유효하지 않거나 만료되었습니다.")
+
+    user = auth_service.get_user_by_id_db(db, user_id)
+
+    if user is None:
+        raise HTTPException(status_code=401, detail="사용자를 찾을 수 없습니다.")
+
+    return user
+
+
 @router.post("/signup", response_model=AuthResponse, status_code=201)
 def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     if auth_service.get_user_by_username_db(db, payload.username):

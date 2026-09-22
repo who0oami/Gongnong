@@ -40,10 +40,12 @@ def get_or_create_video_db(
 def create_translation_job_db(
     db: Session,
     video_id: int,
+    user_id: int | None = None,
     status: JobStatus = JobStatus.QUEUED,
 ) -> TranslationJob:
     translation_job = TranslationJob(
         video_id=video_id,
+        user_id=user_id,
         status=status.value,
         progress=0,
     )
@@ -173,6 +175,44 @@ def get_transcript_segments_db(
     )
 
     return list(db.execute(statement).scalars().all())
+
+
+def list_translation_jobs_with_video_by_user_db(
+    db: Session,
+    user_id: int,
+) -> list[tuple[TranslationJob, Video]]:
+    statement = (
+        select(TranslationJob, Video)
+        .join(Video, TranslationJob.video_id == Video.id)
+        .where(TranslationJob.user_id == user_id)
+        .order_by(TranslationJob.created_at.desc())
+    )
+
+    return [(row[0], row[1]) for row in db.execute(statement).all()]
+
+
+def delete_translation_job_db(db: Session, translation_job: TranslationJob) -> None:
+    db.delete(translation_job)
+    db.commit()
+
+
+def update_translation_job_group_db(
+    db: Session,
+    translation_job: TranslationJob,
+    group_id: int | None,
+) -> TranslationJob:
+    translation_job.group_id = group_id
+    db.commit()
+    db.refresh(translation_job)
+
+    return translation_job
+
+
+def clear_group_from_jobs_db(db: Session, group_id: int) -> None:
+    statement = select(TranslationJob).where(TranslationJob.group_id == group_id)
+    for translation_job in db.execute(statement).scalars().all():
+        translation_job.group_id = None
+    db.commit()
 
 
 def create_job(url: str) -> Job:

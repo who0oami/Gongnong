@@ -6,6 +6,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
+from models.user import User
+from routers.auth import get_current_user_optional
 from schemas.youtube import YoutubeRequest
 from schemas.job import Job, JobStatus, JobResult, JobSegment
 from services import job_repository
@@ -170,6 +172,7 @@ async def process_job(job_id: str, url: str) -> None:
 async def create_translation_job(
     request: YoutubeRequest,
     background_tasks: BackgroundTasks,
+    current_user: User | None = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     video_id = extract_video_id(request.url)
@@ -185,9 +188,12 @@ async def create_translation_job(
         source_url=request.url,
         youtube_video_id=video_id,
     )
+    # No token, or an invalid/expired one, means an anonymous job (user_id stays null) — it still
+    # runs end to end, it just never shows up in anyone's GET /history.
     translation_job = job_repository.create_translation_job_db(
         db,
         video_id=video.id,
+        user_id=current_user.id if current_user else None,
     )
 
     job = Job(
