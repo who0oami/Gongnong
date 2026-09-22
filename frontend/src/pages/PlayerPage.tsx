@@ -1,3 +1,4 @@
+import { resolveVideoUrl } from "../utils/video";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEasyMode } from "../state/AppContext";
@@ -25,12 +26,12 @@ export default function PlayerPage() {
   const { settings, onboarding } = useUser();
   const { currentUrl, history, currentJob } = useVideo();
 
-  // A freshly-completed conversion carries its result on currentJob; replaying an older item from
-  // HistoryPage instead matches it by URL to read resultVideoUrl off the HistoryItem. Neither is set
-  // for the seed mock history, so hasRealVideo is false and the panel below falls back to the
-  // original placeholder — this flips on automatically once the backend returns real videos.
+  // A freshly-completed conversion carries its result on currentJob (result.video_url, per the
+  // backend's Job schema); replaying an older item from HistoryPage instead matches it by URL to
+  // read resultVideoUrl off the HistoryItem. Neither is set for an empty/in-progress history, so
+  // hasRealVideo is false and the panel below falls back to the original placeholder.
   const matchedHistory = history.find((h) => h.url === currentUrl) ?? null;
-  const resultVideoUrl = currentJob?.resultVideoUrl ?? matchedHistory?.resultVideoUrl;
+  const resultVideoUrl = resolveVideoUrl(currentJob?.result?.video_url ?? matchedHistory?.resultVideoUrl);
   const hasRealVideo = !!resultVideoUrl;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [realDuration, setRealDuration] = useState(0);

@@ -23,19 +23,27 @@ export function useConvertJob() {
   const poll = useCallback(
     (jobId: string) => {
       stopPolling();
-      pollRef.current = window.setInterval(async () => {
+      let fetching = false;
+      const interval = window.setInterval(async () => {
+        if (fetching) return;
+        fetching = true;
         try {
           const latest = await videoApi.getJobStatus(jobId);
+          if (pollRef.current !== interval) return;
           setJob(latest);
-          if (latest.status === "completed" || latest.status === "failed") {
+          if (latest.status === "COMPLETED" || latest.status === "FAILED") {
             stopPolling();
             sessionStorage.removeItem(JOB_ID_KEY);
           }
         } catch (err) {
+          if (pollRef.current !== interval) return;
           setError(err instanceof ApiError ? err.message : "상태 조회에 실패했습니다.");
           stopPolling();
+        } finally {
+          fetching = false;
         }
       }, POLL_INTERVAL_MS);
+      pollRef.current = interval;
     },
     [stopPolling],
   );
@@ -47,11 +55,11 @@ export function useConvertJob() {
       setJob(null);
       setError(null);
       try {
-        const created = await videoApi.startConvert({ sourceUrl });
+        const created = await videoApi.startConvert({ url: sourceUrl });
         setJob(created);
-        if (created.status !== "completed" && created.status !== "failed") {
-          sessionStorage.setItem(JOB_ID_KEY, created.jobId);
-          poll(created.jobId);
+        if (created.status !== "COMPLETED" && created.status !== "FAILED") {
+          sessionStorage.setItem(JOB_ID_KEY, created.job_id);
+          poll(created.job_id);
         }
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "변환 요청에 실패했습니다.");
@@ -70,7 +78,7 @@ export function useConvertJob() {
     try {
       const latest = await videoApi.getJobStatus(jobId);
       setJob(latest);
-      if (latest.status !== "completed" && latest.status !== "failed") {
+      if (latest.status !== "COMPLETED" && latest.status !== "FAILED") {
         poll(jobId);
       } else {
         sessionStorage.removeItem(JOB_ID_KEY);

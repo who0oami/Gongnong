@@ -9,20 +9,30 @@ export interface NewGroupArg {
 }
 
 export default function NewGroupModal({ arg }: { arg: NewGroupArg }) {
-  const { addGroup } = useApp();
+  const { createGroup } = useApp();
   const { closeModal } = useModal();
   const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const hint =
     arg.checkedIds.length > 0 ? `${arg.checkedIds.length}개의 영상으로 그룹을 만듭니다.` : "새 그룹의 이름을 입력하세요.";
 
-  function create() {
+  async function create() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const id = "g" + Date.now();
-    addGroup({ id, name: trimmed, itemIds: [...arg.checkedIds] });
-    arg.onCreated(id);
-    closeModal();
+    setCreating(true);
+    setError("");
+    try {
+      // The backend assigns the real group id — a client-generated one wouldn't exist on the
+      // server for later addItemToGroup/removeItemFromGroup calls to target.
+      const group = await createGroup(trimmed, [...arg.checkedIds]);
+      arg.onCreated(group.id);
+      closeModal();
+    } catch {
+      setError("그룹을 만들지 못했습니다. 잠시 후 다시 시도해주세요.");
+      setCreating(false);
+    }
   }
 
   return (
@@ -42,6 +52,7 @@ export default function NewGroupModal({ arg }: { arg: NewGroupArg }) {
           fontSize: "14px",
         }}
       />
+      {error && <p style={{ fontSize: "13px", color: "#EF4444", margin: "8px 0 0" }}>{error}</p>}
       <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
         <button
           onClick={closeModal}
@@ -61,6 +72,7 @@ export default function NewGroupModal({ arg }: { arg: NewGroupArg }) {
         </button>
         <button
           onClick={create}
+          disabled={creating}
           style={{
             flex: 1,
             padding: "12px",
@@ -70,8 +82,8 @@ export default function NewGroupModal({ arg }: { arg: NewGroupArg }) {
             color: "#fff",
             border: "none",
             borderRadius: "12px",
-            cursor: "pointer",
-            opacity: name.trim() ? 1 : 0.4,
+            cursor: creating ? "default" : "pointer",
+            opacity: !name.trim() || creating ? 0.4 : 1,
           }}
         >
           만들기

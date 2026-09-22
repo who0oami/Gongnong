@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useVideo } from "../state/VideoContext";
 import { useConvertJob } from "../hooks/useConvertJob";
-import { thumbOf, vidId } from "../utils/video";
+import { progressForStatus, resolveVideoUrl, stepIndexForStatus, thumbOf, vidId } from "../utils/video";
 import { MOCK_PROC_STEPS, MOCK_PROC_TOTAL } from "../mocks/processingSteps";
 import ErrorState from "../components/common/ErrorState";
 import Loading from "../components/common/Loading";
@@ -20,9 +20,9 @@ export default function ProcessingPage() {
     if (startedRef.current) return;
     startedRef.current = true;
     resume().then(async (resumed) => {
-      const terminal = resumed?.status === "completed" || resumed?.status === "failed";
+      const terminal = resumed?.status === "COMPLETED" || resumed?.status === "FAILED";
       if (resumed && !(currentUrl && terminal)) {
-        setCurrentUrl(resumed.sourceUrl);
+        setCurrentUrl(resumed.url);
       } else if (currentUrl) {
         await start(currentUrl);
       } else {
@@ -35,19 +35,18 @@ export default function ProcessingPage() {
   }, [currentUrl]);
 
   useEffect(() => {
-    if (initialized && currentUrl && job?.status === "completed" && !navigatedRef.current) {
+    if (initialized && currentUrl && job?.status === "COMPLETED" && !navigatedRef.current) {
       navigatedRef.current = true;
       window.setTimeout(() => {
         setCurrentJob(job);
         addHistoryItem({
-          id: job.jobId,
+          id: job.job_id,
           title: vidId(currentUrl) ? `YouTube 영상 (${vidId(currentUrl)})` : "유튜브 영상",
           url: currentUrl,
           date: new Date().toISOString().slice(0, 10),
           status: "완료",
-          duration: "3:42", // TODO: use the real source duration once the backend returns it on the job.
-          resultVideoUrl: job.resultVideoUrl,
-          subtitleUrl: job.subtitleUrl,
+          duration: "0:00", // TODO: use the real source duration once the backend returns it on the job.
+          resultVideoUrl: resolveVideoUrl(job.result?.video_url),
         });
         navigate("/player");
       }, 500);
@@ -60,10 +59,10 @@ export default function ProcessingPage() {
     void start(currentUrl);
   }
 
-  const progress = job?.status === "completed" ? 100 : Math.min(job?.progress ?? 0, 99);
-  const procStep = Math.min(MOCK_PROC_STEPS.length - 1, Math.floor((progress / 100) * MOCK_PROC_STEPS.length));
-  const failed = job?.status === "failed" || !!error;
-  const failureMessage = error ?? job?.errorMessage ?? "변환에 실패했습니다.";
+  const progress = job ? progressForStatus(job.status) : 0;
+  const procStep = job ? stepIndexForStatus(job.status) : 0;
+  const failed = job?.status === "FAILED" || !!error;
+  const failureMessage = error ?? job?.error_message ?? "변환에 실패했습니다.";
 
   const etaLabel = failed
     ? "변환에 실패했습니다"

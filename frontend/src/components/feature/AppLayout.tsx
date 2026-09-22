@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
 import { useApp } from "../../state/AppContext";
 import { navBtn, navIcon } from "../../styles";
@@ -10,8 +10,15 @@ export default function AppLayout() {
   const [sidebar, setSidebar] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, onboarding } = useApp();
+  const { profile, onboarding, loadHistory } = useApp();
   const easy = onboarding.view === "easy";
+
+  // Shared shell for /home, /history, /mypage — loading here once (loadHistory has a stable
+  // identity, see VideoContext.tsx) covers all three without fetching redundantly on every tab
+  // switch between them, since AppLayout doesn't remount on client-side navigation.
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   const page = location.pathname.startsWith("/history")
     ? "history"
