@@ -1,6 +1,8 @@
 import asyncio
 import subprocess
+import tempfile
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -16,7 +18,8 @@ from services.subtitle_pipeline_service import get_corrected_transcript_data
 from services.demo_gloss_override import DEMO_GLOSS_OVERRIDE, build_display_sequence_from_codes
 from services.ksl_converter import KSLConversionError, KSLConverter
 from services.llm_gloss_service import GeminiKSLConverter
-from services.clip_resolver import resolve_clip_path, VIDEOS_DIR
+from services.clip_resolver import resolve_clip_path, resolve_clips
+from services.gloss_matcher import build_display_sequence
 from services.timeline_builder import build_timeline
 from services.video_merger import merge_timeline_to_video, MISSING_CLIP_FALLBACK_SECONDS
 
@@ -24,19 +27,40 @@ router = APIRouter()
 ksl_converter: KSLConverter = GeminiKSLConverter()
 
 
-def _get_clip_duration(code: str) -> float:
-    """video_merger.py의 __main__ 블록과 동일한 방식: 파일이 없으면 고정값,
-    있으면 ffprobe로 실제 길이를 조회한다."""
-    clip_url = resolve_clip_path(code)
-    if clip_url is None:
+def _get_clip_duration(code: str, clip_paths: dict[str, Path | None]) -> float:
+    """Probe the prepared job file, or use the missing-clip fallback duration."""
+    clip_path = resolve_clip_path(code, clip_paths)
+    if clip_path is None:
         return MISSING_CLIP_FALLBACK_SECONDS
 
     probe = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", str(VIDEOS_DIR / f"{code}.mp4")],
+         "-of", "default=noprint_wrappers=1:nokey=1", str(clip_path)],
         capture_output=True, text=True, check=True,
     )
     return float(probe.stdout.strip())
+
+
+def _render_job_video(job_id: str, segments: list[dict]) -> str:
+    # A single worker owns the lifetime even if the awaiting task is cancelled.
+    with tempfile.TemporaryDirectory(prefix="ksl_job_") as temp_dir:
+        prepared = [
+            {**seg, "display_sequence": seg["display_sequence"]
+             if "display_sequence" in seg else build_display_sequence(seg["gloss_sequence"])}
+            for seg in segments
+        ]
+        clip_paths = resolve_clips(
+            [item for seg in prepared for item in seg["display_sequence"]], Path(temp_dir),
+        )
+        durations = {}
+
+        def get_duration(code: str) -> float:
+            if code not in durations:
+                durations[code] = _get_clip_duration(code, clip_paths)
+            return durations[code]
+
+        timeline = build_timeline(prepared, get_duration)
+        return merge_timeline_to_video(timeline, f"{job_id}.mp4", clip_paths)
 
 
 async def process_job(job_id: str, url: str) -> None:
@@ -131,18 +155,14 @@ async def process_job(job_id: str, url: str) -> None:
                 "gloss_sequence": gloss_sequence,
             })
 
-        # SIGN_MAPPING: 실제 아바타 코드 매칭(gloss -> word/sen code)은
-        # build_timeline 내부에서 build_display_sequence를 통해 이뤄진다.
+        # The render worker maps and downloads clips before timeline calculation.
         job_repository.update_translation_job_db(db, job_id, status=JobStatus.SIGN_MAPPING)
 
         job_repository.update_translation_job_db(db, job_id, status=JobStatus.TIMELINE_BUILDING)
 
         try:
-            timeline = await asyncio.to_thread(build_timeline, timeline_segments, _get_clip_duration)
             video_url = await asyncio.to_thread(
-                merge_timeline_to_video,
-                timeline,
-                f"{job_id}.mp4",
+                _render_job_video, job_id, timeline_segments,
             )
         except Exception as e:
             job_repository.update_translation_job_db(

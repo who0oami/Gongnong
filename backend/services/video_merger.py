@@ -3,8 +3,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from services.clip_resolver import VIDEOS_DIR, resolve_clip_path
-
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "static" / "results"
 IDLE_IMAGE_PATH = Path(__file__).resolve().parent.parent / "static" / "images" / "idle_pose.png"
 
@@ -99,7 +97,9 @@ def _concat(tmp: Path, parts: list[Path], idx: int, out_path: Path | None = None
     return out
 
 
-def merge_timeline_to_video(timeline: list[dict], output_filename: str) -> str:
+def merge_timeline_to_video(
+    timeline: list[dict], output_filename: str, clip_paths: dict[str, Path | None],
+) -> str:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     output_path = RESULTS_DIR / output_filename
     counter = itertools.count()
@@ -119,11 +119,10 @@ def merge_timeline_to_video(timeline: list[dict], output_filename: str) -> str:
                 if item["type"] != "avatar":
                     continue
 
-                clip_url = resolve_clip_path(item["code"])
-                if clip_url is None:
+                src = clip_paths.get(item["code"])
+                if src is None:
                     item_parts.append(_make_idle_pose(tmp, MISSING_CLIP_FALLBACK_SECONDS, next(counter)))
                 else:
-                    src = VIDEOS_DIR / f"{item['code']}.mp4"
                     item_parts.append(_normalize_clip(tmp, src, next(counter)))
 
             seg_base = None
@@ -151,42 +150,9 @@ def merge_timeline_to_video(timeline: list[dict], output_filename: str) -> str:
 
 
 if __name__ == "__main__":
-    import json
-    import subprocess as sp
+    from routers.job import _render_job_video
 
-    from services.timeline_builder import build_timeline
-
-    def get_duration(code: str) -> float:
-        clip_url = resolve_clip_path(code)
-        if clip_url is None:
-            return MISSING_CLIP_FALLBACK_SECONDS
-        probe = sp.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(VIDEOS_DIR / f"{code}.mp4")],
-            capture_output=True, text=True, check=True,
-        )
-        return float(probe.stdout.strip())
-
-    # "첫번째"(WORD0058)/"나"(WORD1157)는 static/videos/에 실제 파일이 있고,
-    # "고민"(WORD0001)은 매칭은 되지만 파일이 없는 케이스(검은 화면 대체 확인용).
-    stt_segments = [
+    print(_render_job_video("demo_result", [
         {"start": 0.5, "end": 6.0, "gloss_sequence": ["첫번째", "고민", "나"]},
         {"start": 7.0, "end": 9.0, "gloss_sequence": ["두번째"]},
-    ]
-
-    timeline = build_timeline(stt_segments, get_duration)
-    print(json.dumps(timeline, ensure_ascii=False, indent=2))
-
-    url = merge_timeline_to_video(timeline, "demo_result.mp4")
-    print("output url:", url)
-
-    output_path = RESULTS_DIR / "demo_result.mp4"
-    print("exists:", output_path.is_file())
-
-    probe = sp.run(
-        ["ffprobe", "-v", "error", "-show_entries",
-         "format=duration:stream=width,height,r_frame_rate,codec_name",
-         "-of", "json", str(output_path)],
-        capture_output=True, text=True, check=True,
-    )
-    print(probe.stdout)
+    ]))
