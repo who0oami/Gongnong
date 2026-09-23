@@ -3,6 +3,7 @@ import { ICON, SPEEDS } from "../../../constants";
 import { fmtTime } from "../../../utils/video";
 
 interface PlayerControlsProps {
+  syncStatus?: string;
   time: number;
   duration: number;
   progressPct: number;
@@ -22,6 +23,7 @@ interface PlayerControlsProps {
 }
 
 export default function PlayerControls({
+  syncStatus = "동기화 준비 중",
   time,
   duration,
   progressPct,
@@ -126,7 +128,7 @@ export default function PlayerControls({
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "rgba(255,255,255,.3)", whiteSpace: "nowrap" }}>
               <span style={{ width: "6px", height: "6px", background: "#10B45F", borderRadius: "999px" }} />
-              동기화됨
+              {syncStatus}
             </div>
           </div>
         </div>

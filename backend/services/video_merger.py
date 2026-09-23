@@ -1,3 +1,5 @@
+from services.timing import measure_ffmpeg, profile_merge
+
 import itertools
 import subprocess
 import tempfile
@@ -27,6 +29,7 @@ def _run_ffmpeg(args: list[str]) -> None:
         raise RuntimeError(f"ffmpeg failed: {' '.join(args)}\n{result.stderr}")
 
 
+@measure_ffmpeg("black")
 def _make_black(tmp: Path, duration: float, idx: int) -> Path:
     out = tmp / f"black_{idx}.mp4"
     _run_ffmpeg([
@@ -38,6 +41,7 @@ def _make_black(tmp: Path, duration: float, idx: int) -> Path:
     return out
 
 
+@measure_ffmpeg("idle_pose")
 def _make_idle_pose(tmp: Path, duration: float, idx: int) -> Path:
     """기본 포즈 정지 이미지를 duration만큼 재생되는 영상으로 만든다.
 
@@ -59,6 +63,7 @@ def _make_idle_pose(tmp: Path, duration: float, idx: int) -> Path:
     return out
 
 
+@measure_ffmpeg("normalize")
 def _normalize_clip(tmp: Path, src: Path, idx: int) -> Path:
     """실제 클립을 1920x1080/30fps/무음으로 통일해서 concat이 가능하게 만든다."""
     out = tmp / f"norm_{idx}.mp4"
@@ -74,6 +79,7 @@ def _normalize_clip(tmp: Path, src: Path, idx: int) -> Path:
     return out
 
 
+@measure_ffmpeg("speed")
 def _apply_speed(tmp: Path, src: Path, speed: float, idx: int) -> Path:
     out = tmp / f"speed_{idx}.mp4"
     _run_ffmpeg([
@@ -84,6 +90,7 @@ def _apply_speed(tmp: Path, src: Path, speed: float, idx: int) -> Path:
     return out
 
 
+@measure_ffmpeg("concat")
 def _concat(tmp: Path, parts: list[Path], idx: int, out_path: Path | None = None) -> Path:
     out = out_path if out_path is not None else tmp / f"concat_{idx}.mp4"
     list_file = tmp / f"concat_{idx}.txt"
@@ -97,6 +104,7 @@ def _concat(tmp: Path, parts: list[Path], idx: int, out_path: Path | None = None
     return out
 
 
+@profile_merge
 def merge_timeline_to_video(
     timeline: list[dict], output_filename: str, clip_paths: dict[str, Path | None],
 ) -> str:

@@ -16,6 +16,7 @@ SINGLE_CORRECTION = service.correct_subtitle
 
 class CorrectSegmentsTests(unittest.TestCase):
     def setUp(self):
+        self.start_patch(patch.dict(os.environ, {f"GEMINI_API_KEY_{name}": "" for name in ("JY", "GYU", "RB", "JH")}))
         self.segments = [
             {"start": 0.08, "end": 2.0, "text": "오늘 광주에 왔습니다."},
             {"start": 2.0, "end": 4.21, "text": "광주 비엔날래에 다녀왔습니다."},

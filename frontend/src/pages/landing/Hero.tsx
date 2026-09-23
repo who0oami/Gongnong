@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import signVideo from "../../imports/_____________v1_20260908.mp4";
+import signVideo from "../../imports/opening_intro.mp4";
 import { ICON } from "../../constants";
 
 const CYCLE_WORDS = ["    ", "수어", "AI", "실시간으"];

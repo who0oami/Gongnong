@@ -47,6 +47,10 @@ class SubtitleCorrectionEndpointTests(unittest.TestCase):
         return value
 
     def setUp(self):
+        self.start_patch(patch.dict(os.environ, {
+            **{f"GEMINI_API_KEY_{name}": "" for name in ("JY", "GYU", "RB", "JH")},
+            "GEMINI_API_KEY": "test-only-key",
+        }))
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
         self.forbidden = []

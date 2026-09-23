@@ -5,7 +5,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE_DIR / "data"
 
-WORD_CSV_PATH = DATA_DIR / "word3000_mapping.csv"
+WORD_CSV_PATH = DATA_DIR / "ALL_WORD_ID_MAPPING.csv"
 SEN_CSV_PATH = DATA_DIR / "sen_sentence_mapping.csv"
 EMOTION_CSV_PATH = DATA_DIR / "감정단어_매핑결과_대체어포함.csv"
 
@@ -24,7 +24,7 @@ def _extract_code(raw_code: str) -> str | None:
 
 
 def _load_word_map() -> dict[str, str]:
-    """word3000_mapping.csv: word -> word_id (동일 단어가 여러 행에 있으면 먼저 나온 것을 사용)"""
+    """ALL_WORD_ID_MAPPING.csv: word -> word_id (동일 단어가 여러 행에 있으면 먼저 나온 것을 사용)"""
     word_map: dict[str, str] = {}
 
     with open(WORD_CSV_PATH, encoding="utf-8-sig", newline="") as f:
@@ -120,7 +120,7 @@ def _match_single_gloss(gloss: str) -> dict:
         "code": None,
     }
 
-    # 1. word3000_mapping.csv 직접 일치
+    # 1. ALL_WORD_ID_MAPPING.csv 직접 일치
     word_id = _WORD_MAP.get(gloss)
     if word_id:
         result.update(matched=True, matched_word=gloss, source="WORD", code=word_id)

@@ -1,90 +1,87 @@
-# TODO: 프롬프트 내용/규칙은 다른 팀원이 설계 중.
-# 여기 있는 프롬프트 문자열은 임시 더미이며,
-# 확정되면 이 부분만 교체 예정. 함수 시그니처(입출력)는 변경 없음.
-
+"""Structured Gemini Gloss conversion with bounded transient-error retries."""
 import json
-import os
 
 from dotenv import load_dotenv
-from google import genai
 from google.genai import types
-
 from services.ksl_converter import KSLConversionError
+from .gemini_client import generate_content, _env_int, GeminiConfigurationError
 
 load_dotenv()
-
 _MODEL_NAME = "gemini-flash-lite-latest"
 
 
 class GlossConversionError(Exception):
-    """Gemini API 호출 또는 응답 처리 과정에서 변환에 실패했을 때 발생하는 예외.
+    """Gemini request or response validation failed."""
 
-    - API 호출 자체가 실패한 경우 (네트워크 오류, 인증 오류, API 키 없음 등)
-    - 응답은 받았지만 JSON 형식이 아니거나 파싱에 실패한 경우
-    둘 다 이 예외로 표현하되, 메시지로 원인을 구분한다.
-    """
+
+def get_gloss_batch_size() -> int:
+    return _env_int("GEMINI_GLOSS_BATCH_SIZE", 5, 1)
+
+
+def convert_batch(texts: list[str]) -> list[list[str]]:
+    """One request per batch; validate and restore input order by index."""
+    if not texts:
+        return []
+    schema = {
+        "type": "object", "required": ["segments"],
+        "properties": {"segments": {
+            "type": "array", "minItems": len(texts), "maxItems": len(texts),
+            "items": {"type": "object", "required": ["index", "glosses"],
+                      "properties": {"index": {"type": "integer"},
+                                     "glosses": {"type": "array", "items": {"type": "string"}}}},
+        }},
+    }
+    try:
+        response = generate_content(
+            model=_MODEL_NAME,
+            contents=json.dumps({"segments": [
+                {"index": i, "text": text} for i, text in enumerate(texts)
+            ]}, ensure_ascii=False),
+            config=types.GenerateContentConfig(
+                system_instruction=(
+                    "각 한국어 segment를 한국수어(KSL) Gloss 배열로 변환하세요. "
+                    "주변 segment는 문맥 파악에만 사용하고 서로 합치거나 옮기지 마세요. "
+                    "모든 입력 index를 정확히 한 번씩 포함하고 해당 glosses를 반환하세요. "
+                    "변환할 Gloss가 없으면 빈 배열을 반환하세요."
+                ),
+                response_mime_type="application/json", response_json_schema=schema,
+            ),
+        )
+    except Exception as exc:
+        # SDK error bodies or URLs can contain secrets; never propagate them to logs/DB.
+        code = getattr(exc, "code", None)
+        reason = str(exc) if isinstance(exc, GeminiConfigurationError) else (str(code) if isinstance(code, int) else type(exc).__name__)
+        raise GlossConversionError(f"Gemini API 호출 실패 ({reason})") from exc
+    try:
+        payload = json.loads(response.text)
+    except (TypeError, ValueError) as exc:
+        raise GlossConversionError("응답 파싱 실패: 유효한 JSON이 아닙니다") from exc
+    entries = payload.get("segments") if isinstance(payload, dict) else None
+    if not isinstance(entries, list) or len(entries) != len(texts):
+        raise GlossConversionError("응답 파싱 실패: 입력과 출력 segment 수가 다릅니다")
+    ordered = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise GlossConversionError("응답 파싱 실패: segment 객체가 아닙니다")
+        index, glosses = entry.get("index"), entry.get("glosses")
+        if type(index) is not int or not 0 <= index < len(texts) or index in ordered:
+            raise GlossConversionError("응답 파싱 실패: 중복 또는 잘못된 index")
+        if not isinstance(glosses, list) or not all(isinstance(g, str) for g in glosses):
+            raise GlossConversionError("응답 파싱 실패: glosses는 문자열 배열이어야 합니다")
+        ordered[index] = glosses
+    return [ordered[i] for i in range(len(texts))]
 
 
 def convert_to_gloss(korean_text: str) -> list[str]:
-    """한국어 문장을 Gemini API를 통해 KSL Gloss 배열로 변환한다.
-
-    Args:
-        korean_text: 변환할 한국어 문장.
-
-    Returns:
-        Gloss 문자열 리스트. 변환할 Gloss가 없는 정상 응답의 경우 빈 리스트를 반환한다.
-
-    Raises:
-        GlossConversionError: Gemini API 호출 자체가 실패했거나,
-            응답을 JSON 형식의 문자열 배열로 파싱하지 못한 경우.
-    """
-    # TODO: 프롬프트는 더미. 팀원이 규칙 확정하면 교체 예정.
-    prompt = (
-        "다음 한국어 문장을 한국수어(KSL) Gloss 배열로 변환해서 "
-        "JSON 배열 형식으로만 답하세요. 다른 설명은 붙이지 마세요. "
-        f"문장: {korean_text}"
-    )
-
-    try:
-        client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-        response = client.models.generate_content(
-            model=_MODEL_NAME,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-            ),
-        )
-    except Exception as e:
-        # 네트워크 오류, 인증 오류, API 키 없음, 잘못된 모델 이름 등
-        # API 호출 자체의 실패는 모두 여기서 GlossConversionError로 변환한다.
-        raise GlossConversionError(f"Gemini API 호출 실패: {e}") from e
-
-    raw_text = response.text
-    if raw_text is None:
-        raise GlossConversionError("Gemini API 호출 실패: 응답 본문이 비어 있음")
-
-    try:
-        gloss_list = json.loads(raw_text)
-    except json.JSONDecodeError as e:
-        raise GlossConversionError(f"응답 파싱 실패: JSON이 아닌 응답입니다 ({e})") from e
-
-    if not isinstance(gloss_list, list) or not all(
-        isinstance(item, str) for item in gloss_list
-    ):
-        raise GlossConversionError(
-            f"응답 파싱 실패: 문자열 배열이 아닙니다 (raw={raw_text!r})"
-        )
-
-    # 정상 응답이지만 변환할 Gloss가 없는 경우 -> 빈 리스트를 그대로 반환 (실패 아님)
-    return gloss_list
+    return convert_batch([korean_text])[0]
 
 
 class GeminiKSLConverter:
-    """기존 Gemini 변환 함수를 KSLConverter 공통 계약에 연결한다."""
-
     def convert(self, korean_text: str) -> list[str]:
-        """Gloss 리스트를 반환하고 변환 실패를 공통 예외로 전달한다."""
+        return self.convert_batch([korean_text])[0]
+
+    def convert_batch(self, texts: list[str]) -> list[list[str]]:
         try:
-            return convert_to_gloss(korean_text)
+            return convert_batch(texts)
         except GlossConversionError as exc:
             raise KSLConversionError(str(exc)) from exc

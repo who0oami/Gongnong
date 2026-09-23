@@ -21,7 +21,7 @@ YouTube 자막(youtube_service)
 
 | 파일 | 역할 |
 |---|---|
-| `services/gloss_matcher.py` | Gloss 단어를 `word3000_mapping.csv` / `sen_sentence_mapping.csv` / 감정단어 CSV 순서로 조회해 아바타 클립 코드(WORD/SEN)로 매칭하고, 매칭 실패 시 원문을 자막(caption)으로 대체한 표시 시퀀스를 만든다. |
+| `services/gloss_matcher.py` | Gloss 단어를 `ALL_WORD_ID_MAPPING.csv` / `sen_sentence_mapping.csv` / 감정단어 CSV 순서로 조회해 아바타 클립 코드(WORD/SEN)로 매칭하고, 매칭 실패 시 원문을 자막(caption)으로 대체한 표시 시퀀스를 만든다. |
 | `services/timeline_builder.py` | segment별 목표 재생시간과 실제 수어 클립 총 길이를 비교해 그대로 재생(case1, 남는 시간은 idle)/배속 조절(case2, 1.2배 이내)/초과(case3, 다음 segment의 idle을 빌려쓰고 남으면 overflow)를 계산한다. |
 | `services/clip_resolver.py` | gloss 코드(WORD/SEN)를 `static/videos/{code}.mp4` 실제 파일 경로로 변환한다. 파일이 없으면 `None`을 반환한다. |
 | `services/video_merger.py` | 계산된 타임라인을 받아 ffmpeg로 클립 정규화(1920x1080/30fps)·배속 조절·검은 화면(gap/idle/누락 클립) 삽입·concat까지 수행해 최종 mp4를 만든다. |
@@ -50,7 +50,7 @@ YouTube 자막(youtube_service)
 
 ### 영상 파일은 git으로 전달되지 않음
 
-`backend/static/videos/`의 실제 mp4 클립과 병합 결과물은 `.gitignore`(`*.mp4`)에 의해 git에 포함되지 않는다. 코드(`gloss_matcher.py` 등)와 CSV(`word3000_mapping.csv` 등)는 git pull로 받아지지만, 영상 파일 자체는 별도로 전달받아야 한다.
+`backend/static/videos/`의 실제 mp4 클립과 병합 결과물은 `.gitignore`(`*.mp4`)에 의해 git에 포함되지 않는다. 코드(`gloss_matcher.py` 등)와 CSV(`ALL_WORD_ID_MAPPING.csv` 등)는 git pull로 받아지지만, 영상 파일 자체는 별도로 전달받아야 한다.
 
 ### 재현 순서
 
