@@ -72,9 +72,16 @@ def profile_merge(function):
             total = time.perf_counter() - started
             ffmpeg_metrics.reset(token)
             lines = [f"{name}: count={metrics.counts[name]} total={metrics.seconds[name]:.2f}s"
-                     for name in ("normalize", "idle_pose", "black", "speed", "concat")]
+                     for name in ("normalize", "idle_pose", "black", "speed", "concat", "idle_extension")]
             lines += [f"normalize_calls={metrics.counts['normalize']} "
-                      f"normalize_unique_sources={len(metrics.sources)}", f"merge_total={total:.2f}s"]
+                      f"normalize_unique_sources={len(metrics.sources)}"]
+            lines += [f"{name}={metrics.counts[name]}" for name in (
+                "normalize_cache_hits", "normalize_cache_misses", "idle_cache_hits", "idle_cache_misses",
+                "normalize_skipped", "normalize_required", "probe_cache_hits", "probe_cache_misses",
+                "idle_extended_count", "idle_fallback_count",
+            )]
+            lines.append(f"idle_extension_total={metrics.seconds['idle_extension']:.2f}s")
+            lines.append(f"merge_total={total:.2f}s")
             emit_metrics("FFmpeg Timing", "\n" + "\n".join(lines))
     return wrapped
 
@@ -96,7 +103,9 @@ def profile_render(function):
                     seconds = max(0.0, seconds - metrics.seconds["FFPROBE_DURATION"])
                 emit_metrics("Render Timing", f"{name} - {seconds:.2f}s count={metrics.counts[name]}", job_id)
             emit_metrics("FFprobe Timing", f"executions={metrics.counts['FFPROBE_DURATION']} "
-                         f"cache_hits={metrics.counts['cache_hits']} total={metrics.seconds['FFPROBE_DURATION']:.2f}s", job_id)
+                         f"cache_hits={metrics.counts['cache_hits']} total={metrics.seconds['FFPROBE_DURATION']:.2f}s "
+                         f"probe_cache_hits={metrics.counts['probe_cache_hits']} "
+                         f"probe_cache_misses={metrics.counts['probe_cache_misses']}", job_id)
             _job_id.reset(job_token)
     return wrapped
 

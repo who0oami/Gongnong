@@ -1,4 +1,5 @@
 import os
+import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import sys
@@ -11,6 +12,7 @@ from botocore.exceptions import ClientError, NoCredentialsError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 from routers import job
+from services import clip_probe
 from services import clip_resolver as resolver, video_merger as merger
 
 ITEM = {"type": "avatar", "code": "WORD0001", "gloss": "고민"}
@@ -117,7 +119,7 @@ class JobClipTests(unittest.TestCase):
         def probe(args, **kwargs):
             self.assertEqual(Path(args[-1]), downloaded[0])
             self.assertTrue(downloaded[0].exists())
-            return Mock(stdout="1.0")
+            return Mock(stdout=json.dumps({"format": {"duration": "1.0"}}))
 
         def normalize(tmp, src, idx):
             self.assertEqual(src, downloaded[0])
@@ -126,7 +128,7 @@ class JobClipTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as results, \
                 patch.object(merger, "RESULTS_DIR", Path(results)), \
-                patch.object(job.subprocess, "run", side_effect=probe) as probe_mock, \
+                patch.object(clip_probe.subprocess, "run", side_effect=probe) as probe_mock, \
                 patch.object(merger, "_normalize_clip", side_effect=normalize) as norm, \
                 patch.object(merger, "_run_ffmpeg"):
             self.assertEqual(job._render_job_video("test", SEGMENTS), "/static/results/test.mp4")
@@ -153,7 +155,7 @@ class JobClipTests(unittest.TestCase):
     def test_concurrent_jobs_have_separate_temp_files(self):
         barrier = threading.Barrier(2)
         paths = []
-        def merge(timeline, filename, mapping):
+        def merge(timeline, filename, mapping, probe_cache=None):
             path = mapping["WORD0001"]
             paths.append(path)
             barrier.wait(timeout=10)

@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import os
-import subprocess
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +23,7 @@ from services.clip_resolver import ClipStorageUnavailable, resolve_clip_path, re
 from services.gloss_matcher import build_display_sequence
 from services.timeline_builder import build_timeline
 from services.video_merger import merge_timeline_to_video, MISSING_CLIP_FALLBACK_SECONDS
+from services.clip_probe import probe_clip
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -32,27 +31,16 @@ ksl_converter: GeminiKSLConverter = GeminiKSLConverter()
 _render_semaphore = asyncio.Semaphore(1)
 
 
-def _ffprobe_timeout_seconds() -> int:
-    try:
-        return max(10, int(os.getenv("FFPROBE_TIMEOUT_SECONDS", "30")))
-    except ValueError:
-        return 30
-
-
-def _get_clip_duration(code: str, clip_paths: dict[str, Path | None]) -> float:
+def _get_clip_duration(
+    code: str, clip_paths: dict[str, Path | None], probe_cache: dict[Path, dict] | None = None,
+) -> float:
     """Probe the prepared job file, or use the missing-clip fallback duration."""
     clip_path = resolve_clip_path(code, clip_paths)
     if clip_path is None:
         return MISSING_CLIP_FALLBACK_SECONDS
 
-    with measure(render_metrics, "FFPROBE_DURATION"):
-        probe = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(clip_path)],
-            capture_output=True, text=True, check=True,
-            timeout=_ffprobe_timeout_seconds(),
-        )
-    return float(probe.stdout.strip())
+    metadata = probe_clip(clip_path, probe_cache if probe_cache is not None else {})
+    return float(metadata["format"]["duration"])
 
 
 @profile_render
@@ -77,10 +65,11 @@ def _render_job_video(job_id: str, segments: list[dict]) -> str:
                          f"unique_avatar_codes={len({item['code'] for item in avatar_items})} "
                          f"missing_clips={sum(clip_paths.get(item['code']) is None for item in avatar_items)}", job_id)
             durations = {}
+            probe_cache: dict[Path, dict] = {}
 
             def get_duration(code: str) -> float:
                 if code not in durations:
-                    durations[code] = _get_clip_duration(code, clip_paths)
+                    durations[code] = _get_clip_duration(code, clip_paths, probe_cache)
                 else:
                     render_metrics.get().counts["cache_hits"] += 1
                 return durations[code]
@@ -88,7 +77,7 @@ def _render_job_video(job_id: str, segments: list[dict]) -> str:
             with measure(render_metrics, "TIMELINE_CALC"):
                 timeline = build_timeline(prepared, get_duration)
             with measure(render_metrics, "VIDEO_MERGE"):
-                return merge_timeline_to_video(timeline, f"{job_id}.mp4", clip_paths)
+                return merge_timeline_to_video(timeline, f"{job_id}.mp4", clip_paths, probe_cache)
 
 
 @time_job

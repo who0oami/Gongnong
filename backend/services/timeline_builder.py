@@ -1,34 +1,69 @@
+import math
 from typing import Callable
 
 from services.gloss_matcher import build_display_sequence
+from services.timing import emit_metrics
 
-# total_sign_duration / target_duration 이 이 배율 이하면 배속으로 흡수한다.
-SPEEDUP_THRESHOLD = 1.2
+
+def normalize_overlapping_segments(segments: list[dict]) -> list[dict]:
+    """Return rendering copies with overlap boundaries derived from original times."""
+    timestamps = [(segment["start"], segment["end"]) for segment in segments]
+    for i, (start, end) in enumerate(timestamps):
+        if not (math.isfinite(start) and math.isfinite(end)) or end <= start:
+            raise ValueError(f"Segment {i + 1}: STT segment duration must be finite and positive")
+
+    # Compute every boundary before constructing any adjusted interval.
+    boundaries = [
+        (current_end + next_start) / 2 if next_start < current_end else None
+        for (_, current_end), (next_start, _) in zip(timestamps, timestamps[1:])
+    ]
+    normalized = []
+    for i, segment in enumerate(segments):
+        start, end = timestamps[i]
+        if i > 0 and boundaries[i - 1] is not None:
+            start = boundaries[i - 1]
+        if i < len(boundaries) and boundaries[i] is not None:
+            end = boundaries[i]
+        if not (math.isfinite(start) and math.isfinite(end)) or start >= end:
+            raise ValueError(
+                f"Segment {i + 1}: midpoint normalization produced an invalid interval "
+                f"{start}-{end}; start must be less than end"
+            )
+        normalized.append({**segment, "start": start, "end": end})
+
+    for i, (original, adjusted) in enumerate(zip(timestamps, normalized)):
+        emit_metrics(
+            "Timeline Normalize",
+            f"segment={i + 1} original={original[0]:.6f}-{original[1]:.6f} "
+            f"normalized={adjusted['start']:.6f}-{adjusted['end']:.6f}",
+        )
+    original_end = timestamps[-1][1] if timestamps else 0.0
+    normalized_end = normalized[-1]["end"] if normalized else 0.0
+    emit_metrics("Timeline Normalize", f"original_last_end={original_end:.6f} "
+                 f"normalized_last_end={normalized_end:.6f}")
+    return normalized
 
 
 def _raw_stats(segment: dict, items: list[dict], get_duration: Callable[[str], float]) -> dict:
-    """borrowing(다음 segment의 idle 빌려오기)을 고려하지 않은, segment 단독 계산 결과."""
+    """Calculate sign duration against the rendering subtitle interval."""
     target_duration = segment["end"] - segment["start"]
+    if not math.isfinite(target_duration) or target_duration <= 0:
+        raise ValueError("STT segment duration must be finite and positive")
 
     total_sign_duration = sum(
         get_duration(item["code"]) for item in items if item["type"] == "avatar"
     )
-
-    if total_sign_duration <= target_duration:
-        case = 1
-    elif target_duration > 0 and total_sign_duration / target_duration <= SPEEDUP_THRESHOLD:
-        case = 2
-    else:
-        case = 3
+    if not math.isfinite(total_sign_duration) or total_sign_duration < 0:
+        raise ValueError("Total sign duration must be finite and non-negative")
+    required_speed = total_sign_duration / target_duration
+    if not math.isfinite(required_speed):
+        raise ValueError("Required sign speed must be finite")
 
     return {
         "target_duration": target_duration,
         "total_sign_duration": total_sign_duration,
-        "case": case,
-        # case 1일 때만 의미 있음: segment 자체가 갖는 여유 시간
+        "required_speed": required_speed,
         "raw_idle": max(0.0, target_duration - total_sign_duration),
-        # case 3일 때만 의미 있음: target을 벗어나는 초과분(속도 조절 없이 그대로 재생했을 때)
-        "raw_overage": max(0.0, total_sign_duration - target_duration),
     }
 
 
@@ -36,86 +71,36 @@ def build_timeline(
     stt_segments: list[dict],
     get_duration: Callable[[str], float],
 ) -> list[dict]:
-    """STT segment별로 build_display_sequence를 호출해 avatar/caption 시퀀스를 얻고,
-    segment 재생 시간 정책(그대로 재생 / 배속 조절 / overflow)에 따라
-    최종 타임라인을 계산한다."""
-
-    n = len(stt_segments)
-    items_per_segment = [
-        seg["display_sequence"] if "display_sequence" in seg
-        else build_display_sequence(seg["gloss_sequence"])
-        for seg in stt_segments
-    ]
-    raw = [
-        _raw_stats(stt_segments[i], items_per_segment[i], get_duration)
-        for i in range(n)
-    ]
-
-    # case 3 segment가 바로 다음 segment(case 1)의 여유 시간을 빌려오는 만큼을
-    # 미리 계산해서, 빌려준 쪽의 idle_duration에서 차감한다.
-    consumed_idle = [0.0] * n
-    borrowed = [0.0] * n
-    overflow = [0.0] * n
-
-    for i in range(n):
-        if raw[i]["case"] != 3:
-            continue
-
-        overage = raw[i]["raw_overage"]
-        next_idx = i + 1
-
-        if next_idx < n and raw[next_idx]["case"] == 1:
-            available = raw[next_idx]["raw_idle"] - consumed_idle[next_idx]
-            lend = min(overage, max(0.0, available))
-            consumed_idle[next_idx] += lend
-        else:
-            lend = 0.0
-
-        borrowed[i] = lend
-        overflow[i] = overage - lend
-
+    """Fit each sign sequence to its subtitle interval without borrowing time."""
     timeline: list[dict] = []
-
-    for i in range(n):
-        stt_start = stt_segments[i]["start"]
-        stt_end = stt_segments[i]["end"]
-        case = raw[i]["case"]
-
-        if case == 1:
-            idle_duration = raw[i]["raw_idle"] - consumed_idle[i]
-            entry = {
-                "stt_start": stt_start,
-                "stt_end": stt_end,
-                "actual_end": stt_end,
-                "speed": 1.0,
-                "idle_duration": idle_duration,
-                "overflow_seconds": 0.0,
-                "items": items_per_segment[i],
-            }
-        elif case == 2:
-            speed = raw[i]["total_sign_duration"] / raw[i]["target_duration"]
-            entry = {
-                "stt_start": stt_start,
-                "stt_end": stt_end,
-                "actual_end": stt_end,
-                "speed": speed,
-                "idle_duration": 0.0,
-                "overflow_seconds": 0.0,
-                "items": items_per_segment[i],
-            }
-        else:  # case 3
-            entry = {
-                "stt_start": stt_start,
-                "stt_end": stt_end,
-                "actual_end": stt_end + overflow[i],
-                "speed": 1.0,
-                "idle_duration": 0.0,
-                "overflow_seconds": overflow[i],
-                "items": items_per_segment[i],
-            }
-
+    for i, segment in enumerate(normalize_overlapping_segments(stt_segments)):
+        items = (segment["display_sequence"] if "display_sequence" in segment
+                 else build_display_sequence(segment["gloss_sequence"]))
+        stats = _raw_stats(segment, items, get_duration)
+        speed = max(1.0, stats["required_speed"])
+        entry = {
+            "stt_start": segment["start"],
+            "stt_end": segment["end"],
+            "actual_end": segment["end"],
+            "speed": speed,
+            "idle_duration": stats["raw_idle"],
+            # Retain the existing result schema; overflow is no longer produced.
+            "overflow_seconds": 0.0,
+            "items": items,
+        }
         timeline.append(entry)
+        emit_metrics(
+            "Timeline",
+            f"segment={i + 1} stt_start={entry['stt_start']:.3f}s "
+            f"stt_end={entry['stt_end']:.3f}s target_duration={stats['target_duration']:.3f}s "
+            f"total_sign_duration={stats['total_sign_duration']:.3f}s "
+            f"required_speed={stats['required_speed']:.6f} applied_speed={speed:.6f} "
+            f"idle_duration={entry['idle_duration']:.3f}s actual_end={entry['actual_end']:.3f}s",
+        )
 
+    final_end = timeline[-1]["actual_end"] if timeline else 0.0
+    subtitle_end = stt_segments[-1]["end"] if stt_segments else 0.0
+    emit_metrics("Timeline", f"final_timeline_end={final_end:.3f}s last_subtitle_end={subtitle_end:.3f}s")
     return timeline
 
 
@@ -133,13 +118,13 @@ if __name__ == "__main__":
 
     cases = {
         "case1_idle": [{"start": 0.0, "end": 6.0, "gloss_sequence": ["오늘", "슬프다"]}],
-        "case2_over_1.2_should_become_case3": [
+        "case2_speedup_over_1.2": [
             {"start": 0.0, "end": 3.0, "gloss_sequence": ["오늘", "슬프다"]}
         ],
         "case2_speedup_within_1.2": [
             {"start": 0.0, "end": 3.3, "gloss_sequence": ["오늘", "슬프다"]}
         ],
-        "case3_overflow": [{"start": 0.0, "end": 2.0, "gloss_sequence": ["오늘", "슬프다"]}],
+        "case2_speedup_without_limit": [{"start": 0.0, "end": 2.0, "gloss_sequence": ["오늘", "슬프다"]}],
     }
 
     for name, segs in cases.items():
