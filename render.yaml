@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: ksl-tube-backend
+    runtime: docker
+    plan: free
+    autoDeploy: false
+    healthCheckPath: /
+    envVars:
+      - key: S3_CLIP_BUCKET
+        value: ksl-tube-avatar-clips
+      - key: AWS_DEFAULT_REGION
+        value: ap-northeast-2
+      - key: PYTHONPATH
+        value: /app/backend
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_SESSION_TOKEN
+        sync: false
