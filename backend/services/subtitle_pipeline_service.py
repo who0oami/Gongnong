@@ -1,3 +1,4 @@
+from services.timing import time_stage
 from services.llm_subtitle_correction_service import correct_segments
 from services.youtube_service import (
     extract_video_id,
@@ -16,13 +17,15 @@ def get_corrected_transcript_data(url: str) -> dict:
     if video_id is None:
         raise ValueError("URL에서 영상 ID를 찾을 수 없습니다.")
 
-    metadata = get_video_metadata(url)
-    transcript, segments = get_transcript_data(video_id)
-    corrected_segments = correct_segments(
-        segments,
-        video_title=metadata["title"],
-        video_description=metadata["description"],
-    )
+    with time_stage("TRANSCRIPTING"):
+        metadata = get_video_metadata(url)
+        transcript, segments = get_transcript_data(video_id)
+    with time_stage("SUBTITLE_CORRECTION"):
+        corrected_segments = correct_segments(
+            segments,
+            video_title=metadata["title"],
+            video_description=metadata["description"],
+        )
 
     return {
         "title": metadata["title"],

@@ -13,18 +13,19 @@ from routers.auth import get_current_user_optional
 from schemas.youtube import YoutubeRequest
 from schemas.job import Job, JobStatus, JobResult, JobSegment
 from services import job_repository
+from services.timing import time_job, time_stage, profile_render, measure, render_metrics, emit_metrics
 from services.youtube_service import extract_video_id
 from services.subtitle_pipeline_service import get_corrected_transcript_data
 from services.demo_gloss_override import DEMO_GLOSS_OVERRIDE, build_display_sequence_from_codes
-from services.ksl_converter import KSLConversionError, KSLConverter
-from services.llm_gloss_service import GeminiKSLConverter
+from services.ksl_converter import KSLConversionError
+from services.llm_gloss_service import GeminiKSLConverter, get_gloss_batch_size
 from services.clip_resolver import resolve_clip_path, resolve_clips
 from services.gloss_matcher import build_display_sequence
 from services.timeline_builder import build_timeline
 from services.video_merger import merge_timeline_to_video, MISSING_CLIP_FALLBACK_SECONDS
 
 router = APIRouter()
-ksl_converter: KSLConverter = GeminiKSLConverter()
+ksl_converter: GeminiKSLConverter = GeminiKSLConverter()
 
 
 def _get_clip_duration(code: str, clip_paths: dict[str, Path | None]) -> float:
@@ -33,36 +34,50 @@ def _get_clip_duration(code: str, clip_paths: dict[str, Path | None]) -> float:
     if clip_path is None:
         return MISSING_CLIP_FALLBACK_SECONDS
 
-    probe = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", str(clip_path)],
-        capture_output=True, text=True, check=True,
-    )
+    with measure(render_metrics, "FFPROBE_DURATION"):
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(clip_path)],
+            capture_output=True, text=True, check=True,
+        )
     return float(probe.stdout.strip())
 
 
+@profile_render
 def _render_job_video(job_id: str, segments: list[dict]) -> str:
     # A single worker owns the lifetime even if the awaiting task is cancelled.
     with tempfile.TemporaryDirectory(prefix="ksl_job_") as temp_dir:
-        prepared = [
-            {**seg, "display_sequence": seg["display_sequence"]
-             if "display_sequence" in seg else build_display_sequence(seg["gloss_sequence"])}
-            for seg in segments
-        ]
-        clip_paths = resolve_clips(
-            [item for seg in prepared for item in seg["display_sequence"]], Path(temp_dir),
-        )
-        durations = {}
+        with time_stage("SIGN_MAPPING", job_id), measure(render_metrics, "DISPLAY_SEQUENCE_PREP"):
+            prepared = [
+                {**seg, "display_sequence": seg["display_sequence"]
+                 if "display_sequence" in seg else build_display_sequence(seg["gloss_sequence"])}
+                for seg in segments
+            ]
+        with time_stage("TIMELINE_BUILDING", job_id):
+            with measure(render_metrics, "S3_CLIP_RESOLVE"):
+                clip_paths = resolve_clips(
+                    [item for seg in prepared for item in seg["display_sequence"]], Path(temp_dir),
+                )
+            avatar_items = [item for seg in prepared for item in seg["display_sequence"] if item["type"] == "avatar"]
+            emit_metrics("Render Stats", f"segments={len(prepared)} avatar_items={len(avatar_items)} "
+                         f"unique_avatar_codes={len({item['code'] for item in avatar_items})} "
+                         f"missing_clips={sum(clip_paths.get(item['code']) is None for item in avatar_items)}", job_id)
+            durations = {}
 
-        def get_duration(code: str) -> float:
-            if code not in durations:
-                durations[code] = _get_clip_duration(code, clip_paths)
-            return durations[code]
+            def get_duration(code: str) -> float:
+                if code not in durations:
+                    durations[code] = _get_clip_duration(code, clip_paths)
+                else:
+                    render_metrics.get().counts["cache_hits"] += 1
+                return durations[code]
 
-        timeline = build_timeline(prepared, get_duration)
-        return merge_timeline_to_video(timeline, f"{job_id}.mp4", clip_paths)
+            with measure(render_metrics, "TIMELINE_CALC"):
+                timeline = build_timeline(prepared, get_duration)
+            with measure(render_metrics, "VIDEO_MERGE"):
+                return merge_timeline_to_video(timeline, f"{job_id}.mp4", clip_paths)
 
 
+@time_job
 async def process_job(job_id: str, url: str) -> None:
     db = SessionLocal()
     try:
@@ -120,40 +135,50 @@ async def process_job(job_id: str, url: str) -> None:
         # 그 외 문장만 실제 Gemini 호출로 gloss 변환한다.
         job_repository.update_translation_job_db(db, job_id, status=JobStatus.KSL_CONVERTING)
 
-        timeline_segments: list[dict] = []
+        with time_stage("KSL_CONVERTING") as gloss_timer:
+            timeline_segments: list[dict] = [
+                {"start": seg.start, "end": seg.end} for seg in segments
+            ]
+            pending = []
+            for index, seg in enumerate(segments):
+                override_codes = DEMO_GLOSS_OVERRIDE.get(seg.source_text)
+                if override_codes is not None:
+                    print(f"[Gloss] {index + 1}/{len(segments)} DEMO override 적용", flush=True)
+                    timeline_segments[index]["display_sequence"] = build_display_sequence_from_codes(override_codes)
+                else:
+                    pending.append((index, seg.corrected_text or seg.source_text))
 
-        for seg in segments:
-            override_codes = DEMO_GLOSS_OVERRIDE.get(seg.source_text)
-
-            if override_codes is not None:
-                timeline_segments.append({
-                    "start": seg.start,
-                    "end": seg.end,
-                    "display_sequence": build_display_sequence_from_codes(override_codes),
-                })
-                continue
-
-            try:
-                gloss_sequence = await asyncio.to_thread(
-                    ksl_converter.convert,
-                    seg.corrected_text or seg.source_text,
-                )
-            except KSLConversionError as e:
-                job_repository.update_translation_job_db(
-                    db,
-                    job_id,
-                    status=JobStatus.FAILED,
-                    failed_stage="KSL_CONVERTING",
-                    error_code="GLOSS_CONVERSION_ERROR",
-                    error_message=str(e),
-                )
-                return
-
-            timeline_segments.append({
-                "start": seg.start,
-                "end": seg.end,
-                "gloss_sequence": gloss_sequence,
-            })
+            batch_size = get_gloss_batch_size()
+            batch_count = (len(pending) + batch_size - 1) // batch_size
+            for offset in range(0, len(pending), batch_size):
+                chunk = pending[offset:offset + batch_size]
+                batch_number = offset // batch_size + 1
+                # List exact original positions when overrides leave gaps.
+                positions = [index + 1 for index, _ in chunk]
+                label = (f"{positions[0]}-{positions[-1]}"
+                         if positions == list(range(positions[0], positions[-1] + 1))
+                         else ",".join(map(str, positions)))
+                print(f"[Gloss Batch] {batch_number}/{batch_count} 변환 시작 (segments {label})", flush=True)
+                try:
+                    gloss_sequences = await asyncio.to_thread(
+                        ksl_converter.convert_batch, [text for _, text in chunk],
+                    )
+                    if len(gloss_sequences) != len(chunk):
+                        raise KSLConversionError("입력과 출력 segment 수가 다릅니다")
+                except KSLConversionError as e:
+                    gloss_timer.failed = True
+                    job_repository.update_translation_job_db(
+                        db,
+                        job_id,
+                        status=JobStatus.FAILED,
+                        failed_stage="KSL_CONVERTING",
+                        error_code="GLOSS_CONVERSION_ERROR",
+                        error_message=str(e),
+                    )
+                    return
+                for (index, _), gloss_sequence in zip(chunk, gloss_sequences):
+                    timeline_segments[index]["gloss_sequence"] = gloss_sequence
+                print(f"[Gloss Batch] {batch_number}/{batch_count} 변환 완료", flush=True)
 
         # The render worker maps and downloads clips before timeline calculation.
         job_repository.update_translation_job_db(db, job_id, status=JobStatus.SIGN_MAPPING)

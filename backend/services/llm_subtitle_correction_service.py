@@ -6,6 +6,7 @@ import re
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from .gemini_client import generate_content, KEY_NAMES
 
 load_dotenv()
 
@@ -38,7 +39,7 @@ _RESPONSE_SCHEMA = {
 
 def _log_api_error(e: Exception) -> None:
     error_message = str(e)
-    for key_name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+    for key_name in ("GEMINI_API_KEY", "GOOGLE_API_KEY", *(f"GEMINI_API_KEY_{name}" for name in KEY_NAMES)):
         api_key = os.environ.get(key_name)
         if api_key:
             error_message = error_message.replace(api_key, "[REDACTED]")
@@ -117,17 +118,17 @@ def correct_subtitle(
     )
 
     try:
-        with genai.Client(api_key=os.environ.get("GEMINI_API_KEY")) as client:
-            response = client.models.generate_content(
-                model=_MODEL_NAME,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=_SYSTEM_PROMPT,
-                    response_mime_type="application/json",
-                    response_json_schema=_RESPONSE_SCHEMA,
-                ),
-            )
-            raw_text = response.text
+        response = generate_content(
+            max_retries=0,
+            model=_MODEL_NAME,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=_SYSTEM_PROMPT,
+                response_mime_type="application/json",
+                response_json_schema=_RESPONSE_SCHEMA,
+            ),
+        )
+        raw_text = response.text
     except Exception as e:
         _log_api_error(e)
         return current_text
@@ -202,7 +203,7 @@ def correct_segments(
     """전체 자막을 한 번에 교정하고 원본 index로 복사본에 매핑한다.
 
     긴 영상도 단일 요청을 사용하며, 요청 한도 초과 등 실패 시 원문을 반환한다.
-    자동 재시도나 개별 문장 재호출은 하지 않는다.
+    429는 설정된 대체 키를 한 번씩 시도하며, backoff 재시도나 개별 문장 재호출은 하지 않는다.
     """
     if not segments:
         return []
@@ -223,23 +224,18 @@ def correct_segments(
     )
 
     try:
-        with genai.Client(
-            api_key=os.environ.get("GEMINI_API_KEY"),
-            http_options=types.HttpOptions(
-                retry_options=types.HttpRetryOptions(attempts=1),
+        response = generate_content(
+            max_retries=0,
+            model=_MODEL_NAME,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=_SEGMENTS_SYSTEM_PROMPT,
+                response_mime_type="application/json",
+                response_json_schema=_SEGMENTS_RESPONSE_SCHEMA,
             ),
-        ) as client:
-            response = client.models.generate_content(
-                model=_MODEL_NAME,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=_SEGMENTS_SYSTEM_PROMPT,
-                    response_mime_type="application/json",
-                    response_json_schema=_SEGMENTS_RESPONSE_SCHEMA,
-                ),
-            )
-            _log_usage_metadata(response, len(segments))
-            raw_text = response.text
+        )
+        _log_usage_metadata(response, len(segments))
+        raw_text = response.text
     except Exception as e:
         _log_api_error(e)
         return corrected_segments
