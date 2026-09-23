@@ -1,5 +1,6 @@
+import { useSynchronizedPlayback } from "../hooks/useSynchronizedPlayback";
 import { resolveVideoUrl } from "../utils/video";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEasyMode } from "../state/AppContext";
 import { useUser } from "../state/UserContext";
@@ -33,8 +34,8 @@ export default function PlayerPage() {
   const matchedHistory = history.find((h) => h.url === currentUrl) ?? null;
   const resultVideoUrl = resolveVideoUrl(currentJob?.result?.video_url ?? matchedHistory?.resultVideoUrl);
   const hasRealVideo = !!resultVideoUrl;
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [realDuration, setRealDuration] = useState(0);
+  const playback = useSynchronizedPlayback(currentUrl, resultVideoUrl, parseFloat(settings.defaultSpeed) || 1);
+  const { videoRef, time, duration, playing, done, speed } = playback;
 
   const [layout, setLayout] = useState<LayoutId>(() => deriveDefaultLayout(onboarding.prefs));
   const [showLayout, setShowLayout] = useState(false);
@@ -42,41 +43,12 @@ export default function PlayerPage() {
   // dismissing the banner for one segment doesn't permanently hide it for every later segment too.
   const [dismissedSub, setDismissedSub] = useState<Subtitle | null>(null);
   const [viewMode, setViewMode] = useState<"수어" | "자막">("수어");
-  const [playing, setPlaying] = useState(false);
-  const [time, setTime] = useState(0);
-  const [done, setDone] = useState(false);
-  const [speed, setSpeed] = useState(parseFloat(settings.defaultSpeed) || 1);
   const [speedOpen, setSpeedOpen] = useState(false);
-  const duration = hasRealVideo ? realDuration : 180;
 
   useEffect(() => {
     if (!currentUrl) navigate("/home");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUrl]);
-
-  // Fake-playback fallback for when there's no real video yet (see hasRealVideo above) — keeps the
-  // demo watchable without a backend. Once resultVideoUrl exists, the <video> element's own events
-  // (onTimeUpdate/onEnded/etc. below) drive time/playing/done instead and this effect no-ops.
-  useEffect(() => {
-    if (hasRealVideo) return;
-    if (!playing) return;
-    const id = window.setInterval(() => {
-      setTime((t) => {
-        const nt = t + 0.5 * speed;
-        if (nt >= duration) {
-          setPlaying(false);
-          setDone(true);
-          return duration;
-        }
-        return nt;
-      });
-    }, 500);
-    return () => window.clearInterval(id);
-  }, [playing, speed, duration, hasRealVideo]);
-
-  useEffect(() => {
-    if (hasRealVideo && videoRef.current) videoRef.current.playbackRate = speed;
-  }, [speed, hasRealVideo]);
 
   useEffect(() => {
     const sub = MOCK_SUBTITLES.find((s) => time >= s.start && time <= s.end);
@@ -94,32 +66,14 @@ export default function PlayerPage() {
   const watchUrl = vidId(currentUrl) ? `https://www.youtube.com/watch?v=${vidId(currentUrl)}` : "https://www.youtube.com";
 
   function backHome() {
-    setPlaying(false);
+    playback.pause();
     navigate("/home");
   }
 
   function seek(e: React.MouseEvent<HTMLDivElement>) {
     const r = e.currentTarget.getBoundingClientRect();
     const next = Math.max(0, Math.min(duration, ((e.clientX - r.left) / r.width) * duration));
-    if (hasRealVideo && videoRef.current) videoRef.current.currentTime = next;
-    else setTime(next);
-  }
-
-  function skip(deltaSec: number) {
-    if (hasRealVideo && videoRef.current) {
-      videoRef.current.currentTime = Math.max(0, Math.min(duration, videoRef.current.currentTime + deltaSec));
-    } else {
-      setTime((t) => Math.max(0, Math.min(duration, t + deltaSec)));
-    }
-  }
-
-  function togglePlay() {
-    if (hasRealVideo && videoRef.current) {
-      if (playing) videoRef.current.pause();
-      else videoRef.current.play();
-    } else {
-      setPlaying((p) => !p);
-    }
+    playback.seekTo(next);
   }
 
   const barZoom = easy ? 1.5 : 1;
@@ -161,14 +115,13 @@ export default function PlayerPage() {
           resultVideoUrl={resultVideoUrl}
           videoRef={videoRef}
           playing={playing}
-          onTimeUpdate={() => setTime(videoRef.current?.currentTime ?? 0)}
-          onLoadedMetadata={() => setRealDuration(videoRef.current?.duration ?? 0)}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onEnded={() => {
-            setPlaying(false);
-            setDone(true);
-          }}
+          youtubeEvents={playback.youtubeEvents}
+          onTimeUpdate={playback.onTimeUpdate}
+          onLoadedMetadata={playback.onLoadedMetadata}
+          onWaiting={playback.onWaiting}
+          onCanPlay={playback.onCanPlay}
+          onVideoError={playback.onVideoError}
+          onEnded={playback.onEnded}
         />
 
         {showConf && <ConfidenceBanner onShowSubtitle={() => setViewMode("자막")} onDismiss={() => setDismissedSub(sub ?? null)} />}
@@ -177,6 +130,7 @@ export default function PlayerPage() {
       </div>
 
       <PlayerControls
+        syncStatus={playback.status}
         time={time}
         duration={duration}
         progressPct={progressPct}
@@ -184,11 +138,11 @@ export default function PlayerPage() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         playing={playing}
-        onTogglePlay={togglePlay}
-        onSkip={skip}
+        onTogglePlay={playback.togglePlay}
+        onSkip={playback.skip}
         speed={speed}
         onSpeedChange={(v) => {
-          setSpeed(v);
+          playback.changeSpeed(v);
           setSpeedOpen(false);
         }}
         speedOpen={speedOpen}

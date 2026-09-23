@@ -1,6 +1,6 @@
 import type { CSSProperties, RefObject } from "react";
 import type { LayoutId } from "../../../constants";
-import { thumbOf } from "../../../utils/video";
+import YouTubeVideo, { type YouTubeEvents } from "./YouTubeVideo";
 
 const panelBase: CSSProperties = {
   position: "relative",
@@ -24,8 +24,10 @@ interface VideoStageProps {
   playing: boolean;
   onTimeUpdate: () => void;
   onLoadedMetadata: () => void;
-  onPlay: () => void;
-  onPause: () => void;
+  youtubeEvents: YouTubeEvents;
+  onWaiting: () => void;
+  onCanPlay: () => void;
+  onVideoError: () => void;
   onEnded: () => void;
 }
 
@@ -42,42 +44,21 @@ export default function VideoStage({
   playing,
   onTimeUpdate,
   onLoadedMetadata,
-  onPlay,
-  onPause,
+  youtubeEvents,
+  onWaiting,
+  onCanPlay,
+  onVideoError,
   onEnded,
 }: VideoStageProps) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: layout === "stacked" ? "column" : "row", gap: "12px", minHeight: 0 }}>
-      {showOriginal && (
-        <div style={{ ...panelBase, background: "#0a0c10", flex: layoutFlex[0], minHeight: "160px" }}>
-          <img
-            src={thumbOf(currentUrl, "maxresdefault")}
-            alt="원본 영상"
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.6 }}
-          />
-          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.5)" }} />
-          <div style={{ position: "relative", zIndex: 10, textAlign: "center", padding: "0 24px" }}>
-            <p style={{ color: "#fff", fontWeight: 600, fontSize: "14px", margin: "0 0 4px" }}>이 환경에서는 임베드가 제한됩니다</p>
-            <p style={{ color: "rgba(255,255,255,.5)", fontSize: "12px", margin: "0 0 16px" }}>배포된 서비스 환경에서는 정상 재생됩니다</p>
-            <a
-              href={watchUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "#10B45F", color: "#fff", fontSize: "12px", fontWeight: 600, padding: "10px 16px", borderRadius: "12px", textDecoration: "none" }}
-            >
-              <svg viewBox="0 0 24 24" style={{ width: "14px", height: "14px", fill: "#fff" }}>
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              YouTube에서 보기
-            </a>
-          </div>
+      <div style={{ ...panelBase, display: showOriginal ? "flex" : "none", background: "#0a0c10", flex: layoutFlex[0], minHeight: "200px" }}>
+          <YouTubeVideo currentUrl={currentUrl} watchUrl={watchUrl} events={youtubeEvents} />
           <div style={{ position: "absolute", top: "10px", left: "10px", fontSize: "10px", fontWeight: 600, color: "rgba(255,255,255,.5)", background: "rgba(0,0,0,.4)", padding: "1px 8px", borderRadius: "6px", zIndex: 10 }}>
             원본
           </div>
         </div>
-      )}
-      {showSign && (
-        <div style={{ ...panelBase, background: "#111827", border: "1px solid rgba(255,255,255,.06)", flex: layoutFlex[1], minHeight: "120px" }}>
+      <div style={{ ...panelBase, display: showSign ? "flex" : "none", background: "#111827", border: "1px solid rgba(255,255,255,.06)", flex: layoutFlex[1], minHeight: "120px" }}>
           {hasRealVideo ? (
             <video
               ref={videoRef}
@@ -85,8 +66,11 @@ export default function VideoStage({
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
               onTimeUpdate={onTimeUpdate}
               onLoadedMetadata={onLoadedMetadata}
-              onPlay={onPlay}
-              onPause={onPause}
+              muted
+              playsInline
+              onWaiting={onWaiting}
+              onCanPlay={onCanPlay}
+              onError={onVideoError}
               onEnded={onEnded}
             />
           ) : (
@@ -120,7 +104,6 @@ export default function VideoStage({
             <span style={{ fontSize: "10px", fontWeight: 600, color: "rgba(255,255,255,.4)", background: "rgba(0,0,0,.3)", padding: "1px 8px", borderRadius: "6px" }}>수어</span>
           </div>
         </div>
-      )}
     </div>
   );
 }
