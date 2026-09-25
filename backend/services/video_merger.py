@@ -130,7 +130,8 @@ def _extend_last_frame(tmp: Path, src: Path, duration: float, idx: int) -> Path:
     out = tmp / f"extended_{idx}.mp4"
     _run_ffmpeg([
         "-i", str(src), "-vf", f"tpad=stop_mode=clone:stop={_idle_frame_count(duration)}",
-        "-an", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", str(out),
+        "-an", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "1",
+        "-pix_fmt", "yuv420p", str(out),
     ])
     return out
 

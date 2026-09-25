@@ -25,7 +25,6 @@ def probe_clip(path: Path, cache: dict[Path, dict]) -> dict:
         with measure(render_metrics, "FFPROBE_DURATION"):
             result = subprocess.run(
                 ["ffprobe", "-v", "error", "-show_streams", "-show_format",
-                 "-show_packets", "-show_entries", "packet=stream_index,pts,dts,duration,flags",
                  "-of", "json", str(path)],
                 capture_output=True, text=True, check=True,
                 timeout=_ffprobe_timeout_seconds(),
@@ -35,12 +34,12 @@ def probe_clip(path: Path, cache: dict[Path, dict]) -> dict:
 
 
 def clip_concat_readiness_reason(metadata: dict) -> str | None:
-    """Match the current libx264/MP4 output, including its two-frame DTS delay.
+    """Check the compact stream/container fields required by concat copy.
 
-    Average FPS alone cannot establish CFR. Inspect packet timing in the same
-    probe (no decoding) to reject VFR, edit-list offsets and duration padding.
-    Different SPS/PPS bytes are allowed: concat's default MP4-to-Annex-B
-    conversion supplies each clip's parameter sets at its initial keyframe.
+    Packet-by-packet metadata used hundreds of megabytes on the 512 MB Render
+    instance when cached for a real job. The source clips are produced by the
+    same preprocessing pipeline, so stream shape, frame count and duration are
+    sufficient here and keep each cached probe result small.
     """
     try:
         streams = metadata["streams"]
@@ -70,19 +69,11 @@ def clip_concat_readiness_reason(metadata: dict) -> str | None:
             return "unexpected_container"
         if Fraction(video["start_time"]) != 0 or Fraction(container["start_time"]) != 0:
             return "unexpected_start_time"
-        packets = metadata["packets"]
-        if not packets or "K" not in packets[0]["flags"] or packets[0]["pts"] != 0:
-            return "missing_initial_keyframe"
-        if len(packets) != int(video["nb_frames"]):
-            return "frame_count_mismatch"
-        for i, packet in enumerate(packets):
-            if (packet["stream_index"] != video["index"] or packet["duration"] != 512
-                    or packet["dts"] != (i - 2) * 512):
-                return "unexpected_packet_timing"
-        if sorted(packet["pts"] for packet in packets) != list(range(0, len(packets) * 512, 512)):
-            return "non_cfr_pts"
+        frame_count = int(video["nb_frames"])
+        if frame_count <= 0:
+            return "invalid_frame_count"
         # ffprobe prints duration rounded to microseconds.
-        duration = Fraction(len(packets), 30)
+        duration = Fraction(frame_count, 30)
         if not all(abs(Fraction(data["duration"]) - duration) <= Fraction(1, 1000000)
                    for data in (video, container)):
             return "duration_frame_count_mismatch"

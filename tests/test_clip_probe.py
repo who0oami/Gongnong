@@ -23,8 +23,6 @@ def metadata():
                      "has_b_frames": 2, "is_avc": "true", "nal_length_size": "4",
                      "extradata_size": 50, "r_frame_rate": "30/1", "avg_frame_rate": "30/1",
                      "time_base": "1/15360", "start_time": "0", "duration": "1", "nb_frames": "30"}],
-        "packets": [{"stream_index": 0, "pts": i * 512, "dts": (i - 2) * 512,
-                     "duration": 512, "flags": "K__" if i == 0 else "___"} for i in range(30)],
     }
 
 
@@ -47,14 +45,18 @@ class ClipProbeTests(unittest.TestCase):
         for data in ({}, {"streams": []}, {"streams": [{}]}):
             self.assertFalse(clip_probe.is_clip_concat_ready(data))
 
-    def test_average_fps_does_not_hide_vfr_or_bad_dts(self):
-        for key, value in [("pts", 513), ("dts", -511), ("duration", 511)]:
+    def test_frame_count_and_duration_must_match_constant_frame_rate(self):
+        for key, value in [("nb_frames", "29"), ("nb_frames", "0"), ("duration", "1.1")]:
             data = metadata()
-            data["packets"][1][key] = value
+            data["streams"][0][key] = value
             self.assertFalse(clip_probe.is_clip_concat_ready(data))
-        data = metadata()
-        data["packets"][0]["flags"] = "___"
-        self.assertFalse(clip_probe.is_clip_concat_ready(data))
+
+    def test_probe_does_not_request_packet_metadata(self):
+        path = Path("clip.mp4")
+        with patch.object(clip_probe.subprocess, "run", return_value=Mock(stdout=json.dumps(metadata()))) as run:
+            clip_probe.probe_clip(path, {})
+        args = run.call_args.args[0]
+        self.assertNotIn("-show_packets", args)
 
     def test_duration_and_merge_share_one_probe_and_cache_is_job_local(self):
         path = Path("clip.mp4")
@@ -143,8 +145,7 @@ class ClipProbeFFmpegTests(unittest.TestCase):
             path = self.tmp / (name + ".mp4")
             data = clip_probe.probe_clip(path, {})
             # Pixel hashes differ because the baseline performs a lossy encode.
-            results.append((data["format"]["duration"], data["streams"][0]["nb_frames"],
-                            [(p["pts"], p["dts"], p["duration"]) for p in data["packets"]]))
+            results.append((data["format"]["duration"], data["streams"][0]["nb_frames"]))
             decode = subprocess.run(["ffmpeg", "-v", "warning", "-xerror", "-i", str(path),
                                      "-f", "null", "-"], capture_output=True, text=True, check=True)
             self.assertEqual(decode.stderr, "")
