@@ -72,11 +72,12 @@ class TimelineBuilderTests(unittest.TestCase):
         for entry in result:
             self.assertGreaterEqual(entry["stt_start"], cursor)
             cursor += entry["stt_start"] - cursor
-            cursor += 10 / entry["speed"] + entry["idle_duration"]
+            cursor += 10 * len(entry["items"]) / entry["speed"] + entry["idle_duration"]
             self.assertAlmostEqual(cursor, entry["stt_end"])
             self.assertEqual(entry["actual_end"], entry["stt_end"])
         self.assertAlmostEqual(cursor, 18.480)
-        self.assertAlmostEqual(result[1]["speed"], 10 / (13.3995 - 10.099))
+        self.assertEqual(len(result), 1)
+        self.assertAlmostEqual(result[0]["speed"], 30 / (18.480 - 5.319))
         messages = "\n".join(c.args[0] for c in log.call_args_list)
         self.assertIn("[Timeline Normalize] segment=2 original=8.519000-15.120000 normalized=10.099000-13.399500", messages)
         self.assertIn("original_last_end=18.480000 normalized_last_end=18.480000", messages)
@@ -92,18 +93,17 @@ class TimelineBuilderTests(unittest.TestCase):
                 self.assertEqual(entry["actual_end"], 12.5)
                 self.assertEqual(entry["overflow_seconds"], 0)
 
-    def test_long_sequences_do_not_borrow_idle_or_extend_90_second_timeline(self):
+    def test_long_sequences_share_group_time_without_extending_90_second_timeline(self):
         segments = [segment(1, 3, "LONG"), segment(3, 10, "SHORT"), segment(12, 90, "LONG", "LONG")]
         durations = {"LONG": 60, "SHORT": 1}
         with patch("builtins.print") as log:
             result = builder.build_timeline(segments, durations.__getitem__)
-        self.assertEqual(result[0]["speed"], 30)
-        self.assertEqual(result[1]["idle_duration"], 6)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["speed"], 181 / 89)
+        self.assertEqual(result[0]["idle_duration"], 0)
+        self.assertEqual(result[0]["items"], [item for seg in segments for item in seg["display_sequence"]])
         cursor = 0
-        for original, entry in zip(segments, result):
-            self.assertEqual(entry["stt_start"], original["start"])
-            self.assertEqual(entry["stt_end"], original["end"])
-            self.assertEqual(entry["items"], original["display_sequence"])
+        for entry in result:
             cursor += entry["stt_start"] - cursor
             cursor += sum(durations[item["code"]] for item in entry["items"]) / entry["speed"]
             cursor += entry["idle_duration"]
@@ -128,6 +128,80 @@ class TimelineBuilderTests(unittest.TestCase):
         for end in (0, -1, float("nan"), float("inf")):
             with self.subTest(end=end), self.assertRaisesRegex(ValueError, "finite and positive"):
                 builder.build_timeline([segment(0, end, "A")], lambda _: 1)
+
+
+class RenderGroupingTests(unittest.TestCase):
+    def build(self, segments, durations):
+        snapshot = deepcopy(segments)
+        probe = Mock(side_effect=durations.__getitem__)
+        with patch("builtins.print") as log:
+            result = builder.build_timeline(segments, probe)
+        self.assertEqual(segments, snapshot)
+        original_items = [item for seg in segments for item in seg["display_sequence"]]
+        self.assertEqual([item for group in result for item in group["items"]], original_items)
+        self.assertEqual(probe.call_count, sum(item["type"] == "avatar" for item in original_items))
+        for entry in result:
+            total = sum(durations[item["code"]] for item in entry["items"] if item["type"] == "avatar")
+            target = entry["stt_end"] - entry["stt_start"]
+            self.assertAlmostEqual(entry["speed"], max(1, total / target))
+            self.assertAlmostEqual(entry["idle_duration"], max(0, target - total))
+            self.assertAlmostEqual(total / entry["speed"] + entry["idle_duration"], target)
+            self.assertEqual(entry["actual_end"], entry["stt_end"])
+            self.assertEqual(entry["overflow_seconds"], 0)
+        self.assertEqual(result[-1]["actual_end"], segments[-1]["end"])
+        return result, "\n".join(c.args[0] for c in log.call_args_list)
+
+    def test_two_segments_are_sufficient_and_threshold_is_inclusive(self):
+        source = [segment(i, i + 1, str(i)) for i in range(4)]
+        for duration in (0.5, 1.8):
+            with self.subTest(duration=duration):
+                result, logs = self.build(source, {str(i): duration for i in range(4)})
+                self.assertEqual([(r["stt_start"], r["stt_end"]) for r in result], [(0, 2), (2, 4)])
+                self.assertIn("[Render Group] segments=1-2", logs)
+                self.assertIn("segment_count=2 gloss_count=2", logs)
+
+    def test_expands_to_three(self):
+        result, logs = self.build([segment(0, 1, "A"), segment(1, 2, "B"), segment(2, 6, "C")],
+                                  {"A": 3, "B": 3, "C": 1})
+        self.assertEqual(len(result), 1)
+        self.assertAlmostEqual(result[0]["speed"], 7 / 6)
+        self.assertIn("segment_count=3", logs)
+
+    def test_expands_to_four_and_does_not_cap_speed_or_take_fifth(self):
+        source = [segment(i, i + 1, str(i)) for i in range(5)]
+        result, logs = self.build(source, {str(i): 10 for i in range(5)})
+        self.assertEqual([len(r["items"]) for r in result], [4, 1])
+        self.assertEqual(result[0]["speed"], 10)
+        self.assertIn("segments=1-4", logs)
+        self.assertIn("segments=5-5", logs)
+
+    def test_empty_tail_pairs_with_next_even_at_low_speed(self):
+        result, logs = self.build([segment(0, 2, "A"), segment(2, 4), segment(4, 6, "B")],
+                                  {"A": 1, "B": 1})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["idle_duration"], 4)
+        self.assertIn("segment_count=3 gloss_count=2", logs)
+
+    def test_empty_first_is_already_paired_and_all_empty_respects_maximum(self):
+        result, _ = self.build([segment(0, 2), segment(2, 4, "A"), segment(4, 6, "B")],
+                               {"A": 1, "B": 1})
+        self.assertEqual(len(result), 2)
+        result, _ = self.build([segment(i, i + 1) for i in range(5)], {})
+        self.assertEqual([r["idle_duration"] for r in result], [4, 1])
+
+    def test_last_singleton_and_gaps_preserve_final_end(self):
+        result, _ = self.build([segment(2, 4, "A"), segment(5, 8, "B"), segment(10, 13, "C")],
+                               {"A": 1, "B": 1, "C": 1})
+        self.assertEqual([(r["stt_start"], r["stt_end"]) for r in result], [(2, 8), (10, 13)])
+        self.assertEqual([r["idle_duration"] for r in result], [4, 2])
+
+    def test_normalization_precedes_grouping_and_preserves_source(self):
+        source = [segment(0, 4, "A"), segment(2, 8, "B"),
+                  segment(6, 12, "C"), segment(10, 14, "D")]
+        result, logs = self.build(source, {code: 1 for code in "ABCD"})
+        self.assertEqual([(r["stt_start"], r["stt_end"]) for r in result], [(0, 7), (7, 14)])
+        self.assertIn("final_timeline_end=14.000s last_subtitle_end=14.000s", logs)
+        self.assertLess(logs.index("[Timeline Normalize]"), logs.index("[Render Group]"))
 
 
 if __name__ == "__main__":

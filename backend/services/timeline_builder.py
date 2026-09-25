@@ -71,17 +71,47 @@ def build_timeline(
     stt_segments: list[dict],
     get_duration: Callable[[str], float],
 ) -> list[dict]:
-    """Fit each sign sequence to its subtitle interval without borrowing time."""
-    timeline: list[dict] = []
-    for i, segment in enumerate(normalize_overlapping_segments(stt_segments)):
+    """Group normalized rendering copies and fit signs exactly within each group."""
+    normalized = normalize_overlapping_segments(stt_segments)
+    prepared = []
+    for segment in normalized:
         items = (segment["display_sequence"] if "display_sequence" in segment
                  else build_display_sequence(segment["gloss_sequence"]))
+        # Probe each segment only once, even when a candidate group expands.
         stats = _raw_stats(segment, items, get_duration)
+        prepared.append((items, stats["total_sign_duration"]))
+
+    timeline: list[dict] = []
+    first = 0
+    while first < len(normalized):
+        stop = min(first + 2, len(normalized))
+        while True:
+            start, end = normalized[first]["start"], normalized[stop - 1]["end"]
+            total = sum(duration for _, duration in prepared[first:stop])
+            target = end - start
+            if not math.isfinite(target) or target <= 0:
+                raise ValueError("Grouped segment duration must be finite and positive")
+            required_speed = total / target
+            if not math.isfinite(total) or not math.isfinite(required_speed):
+                raise ValueError("Grouped sign duration and speed must be finite")
+            # An empty segment already followed by another member is paired.
+            # Pair a trailing empty segment forward when the size limit permits.
+            trailing = normalized[stop - 1]
+            empty_tail = (not trailing["gloss_sequence"] if "gloss_sequence" in trailing
+                          else not prepared[stop - 1][0])
+            if stop < len(normalized) and stop - first < 4 and (required_speed > 1.8 or empty_tail):
+                stop += 1
+                continue
+            break
+
+        items = [item for member_items, _ in prepared[first:stop] for item in member_items]
+        stats = {"target_duration": target, "total_sign_duration": total,
+                 "required_speed": required_speed, "raw_idle": max(0.0, target - total)}
         speed = max(1.0, stats["required_speed"])
         entry = {
-            "stt_start": segment["start"],
-            "stt_end": segment["end"],
-            "actual_end": segment["end"],
+            "stt_start": start,
+            "stt_end": end,
+            "actual_end": end,
             "speed": speed,
             "idle_duration": stats["raw_idle"],
             # Retain the existing result schema; overflow is no longer produced.
@@ -91,12 +121,23 @@ def build_timeline(
         timeline.append(entry)
         emit_metrics(
             "Timeline",
-            f"segment={i + 1} stt_start={entry['stt_start']:.3f}s "
+            f"segment={first + 1} stt_start={entry['stt_start']:.3f}s "
             f"stt_end={entry['stt_end']:.3f}s target_duration={stats['target_duration']:.3f}s "
             f"total_sign_duration={stats['total_sign_duration']:.3f}s "
             f"required_speed={stats['required_speed']:.6f} applied_speed={speed:.6f} "
             f"idle_duration={entry['idle_duration']:.3f}s actual_end={entry['actual_end']:.3f}s",
         )
+        gloss_count = sum(len(segment.get("gloss_sequence", prepared[index][0]))
+                          for index, segment in enumerate(normalized[first:stop], start=first))
+        emit_metrics(
+            "Render Group",
+            f"segments={first + 1}-{stop} start={start:.6f} end={end:.6f} "
+            f"segment_count={stop - first} gloss_count={gloss_count} "
+            f"total_sign_duration={total:.6f} target_duration={target:.6f} "
+            f"required_speed={required_speed:.6f} applied_speed={speed:.6f} "
+            f"idle_duration={entry['idle_duration']:.6f}",
+        )
+        first = stop
 
     final_end = timeline[-1]["actual_end"] if timeline else 0.0
     subtitle_end = stt_segments[-1]["end"] if stt_segments else 0.0
