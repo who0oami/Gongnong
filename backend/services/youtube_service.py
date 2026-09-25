@@ -8,9 +8,12 @@ from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
+    IpBlocked,
     NoTranscriptFound,
+    RequestBlocked,
     TranscriptsDisabled,
     VideoUnavailable,
+    YouTubeTranscriptApiException,
 )
 
 load_dotenv()
@@ -18,6 +21,10 @@ load_dotenv()
 SPELLER_URL = "https://nara-speller.co.kr/old_speller/results"
 
 logger = logging.getLogger(__name__)
+
+
+class TranscriptAccessBlocked(ValueError):
+    """YouTube refused transcript access from the server's network."""
 
 
 def correct_spelling(text: str) -> str:
@@ -257,6 +264,15 @@ def get_transcript_data(video_id: str) -> tuple[str, list[dict]]:
         raise ValueError(
             "존재하지 않거나 재생할 수 없는 영상입니다."
         )
+
+    except (RequestBlocked, IpBlocked) as exc:
+        raise TranscriptAccessBlocked(
+            "서버 네트워크에서 YouTube 자막 접근이 차단되었습니다."
+        ) from exc
+
+    except YouTubeTranscriptApiException as exc:
+        logger.warning("YouTube 자막 조회 실패 (%s)", type(exc).__name__)
+        raise ValueError("YouTube 자막을 가져오지 못했습니다.") from exc
 
     segments = group_into_sentences(transcript)
 

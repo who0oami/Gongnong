@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import subprocess
 import tempfile
 from datetime import datetime
@@ -25,6 +26,7 @@ from services.timeline_builder import build_timeline
 from services.video_merger import merge_timeline_to_video, MISSING_CLIP_FALLBACK_SECONDS
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 ksl_converter: GeminiKSLConverter = GeminiKSLConverter()
 
 
@@ -106,6 +108,17 @@ async def process_job(job_id: str, url: str) -> None:
                 failed_stage="TRANSCRIPTING",
                 error_code="TRANSCRIPT_ERROR",
                 error_message=str(e),
+            )
+            return
+        except Exception:
+            logger.exception("Unexpected transcript pipeline failure for job %s", job_id)
+            job_repository.update_translation_job_db(
+                db,
+                job_id,
+                status=JobStatus.FAILED,
+                failed_stage="TRANSCRIPTING",
+                error_code="TRANSCRIPT_INTERNAL_ERROR",
+                error_message="자막 처리 중 예상하지 못한 오류가 발생했습니다.",
             )
             return
 

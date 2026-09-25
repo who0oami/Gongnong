@@ -1,6 +1,8 @@
 from services.timing import time_stage
 from services.llm_subtitle_correction_service import correct_segments
+from services.gemini_transcript_service import transcribe_youtube_video
 from services.youtube_service import (
+    TranscriptAccessBlocked,
     extract_video_id,
     get_transcript_data,
     get_video_metadata,
@@ -19,13 +21,24 @@ def get_corrected_transcript_data(url: str) -> dict:
 
     with time_stage("TRANSCRIPTING"):
         metadata = get_video_metadata(url)
-        transcript, segments = get_transcript_data(video_id)
-    with time_stage("SUBTITLE_CORRECTION"):
-        corrected_segments = correct_segments(
-            segments,
-            video_title=metadata["title"],
-            video_description=metadata["description"],
-        )
+        used_gemini_transcript = False
+        try:
+            transcript, segments = get_transcript_data(video_id)
+        except TranscriptAccessBlocked:
+            print("[Transcript] YouTube 서버 접근 차단 - Gemini 영상 전사로 대체", flush=True)
+            transcript, segments = transcribe_youtube_video(url)
+            used_gemini_transcript = True
+    if used_gemini_transcript:
+        corrected_segments = [
+            {**segment, "corrected_text": segment["text"]} for segment in segments
+        ]
+    else:
+        with time_stage("SUBTITLE_CORRECTION"):
+            corrected_segments = correct_segments(
+                segments,
+                video_title=metadata["title"],
+                video_description=metadata["description"],
+            )
 
     return {
         "title": metadata["title"],
