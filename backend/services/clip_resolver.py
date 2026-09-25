@@ -28,7 +28,7 @@ def _client_error_code(exc: ClientError) -> str:
     return str(exc.response.get("Error", {}).get("Code", ""))
 
 
-def _create_s3_client():
+def create_s3_client():
     """Prefer explicit deploy credentials so an accidental local profile cannot shadow them."""
     access_key = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
     secret_key = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
@@ -80,7 +80,7 @@ def resolve_clips(display_sequence: list[dict], work_dir: Path) -> dict[str, Pat
             try:
                 if client is None:
                     try:
-                        client = _create_s3_client()
+                        client = create_s3_client()
                     except (BotoCoreError, ClientError, Boto3Error) as exc:
                         stats.counts["failed"] += 1
                         if isinstance(exc, ProfileNotFound):

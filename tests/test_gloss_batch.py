@@ -154,7 +154,8 @@ class JobBatchTests(GlossBatchFixture):
                 patch.object(job, "DEMO_GLOSS_OVERRIDE", overrides or {}), \
                 patch.object(job, "build_display_sequence_from_codes", side_effect=lambda codes: [{"code": c} for c in codes]), \
                 patch.object(job, "ksl_converter", converter or service.GeminiKSLConverter()), \
-                patch.object(job, "_render_job_video", return_value="/static/result.mp4") as render:
+                patch.object(job, "_render_job_video", return_value="/static/result.mp4") as render, \
+                patch.object(job, "_persist_result_video", return_value="/translate/jobs/job/video"):
             asyncio.run(job.process_job("job", "url"))
             session.return_value.close.assert_called_once()
             return repo, render

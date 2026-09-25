@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
@@ -22,8 +23,13 @@ from services.llm_gloss_service import GeminiKSLConverter, get_gloss_batch_size
 from services.clip_resolver import ClipStorageUnavailable, resolve_clip_path, resolve_clips
 from services.gloss_matcher import build_display_sequence
 from services.timeline_builder import build_timeline
-from services.video_merger import merge_timeline_to_video, MISSING_CLIP_FALLBACK_SECONDS
+from services.video_merger import RESULTS_DIR, merge_timeline_to_video, MISSING_CLIP_FALLBACK_SECONDS
 from services.clip_probe import probe_clip
+from services.result_storage import (
+    ResultStorageUnavailable,
+    create_result_download_url,
+    upload_result_video,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -78,6 +84,13 @@ def _render_job_video(job_id: str, segments: list[dict]) -> str:
                 timeline = build_timeline(prepared, get_duration)
             with measure(render_metrics, "VIDEO_MERGE"):
                 return merge_timeline_to_video(timeline, f"{job_id}.mp4", clip_paths, probe_cache)
+
+
+def _persist_result_video(job_id: str, local_url: str) -> str:
+    local_path = RESULTS_DIR / Path(local_url).name
+    persistent_url = upload_result_video(job_id, local_path)
+    local_path.unlink(missing_ok=True)
+    return persistent_url
 
 
 @time_job
@@ -202,8 +215,11 @@ async def process_job(job_id: str, url: str) -> None:
                 job_repository.update_translation_job_db(
                     db, job_id, status=JobStatus.TIMELINE_BUILDING,
                 )
-                video_url = await asyncio.to_thread(
+                local_video_url = await asyncio.to_thread(
                     _render_job_video, job_id, timeline_segments,
+                )
+                video_url = await asyncio.to_thread(
+                    _persist_result_video, job_id, local_video_url,
                 )
         except ClipStorageUnavailable as e:
             job_repository.update_translation_job_db(
@@ -212,6 +228,16 @@ async def process_job(job_id: str, url: str) -> None:
                 status=JobStatus.FAILED,
                 failed_stage="SIGN_MAPPING",
                 error_code="CLIP_STORAGE_UNAVAILABLE",
+                error_message=str(e),
+            )
+            return
+        except ResultStorageUnavailable as e:
+            job_repository.update_translation_job_db(
+                db,
+                job_id,
+                status=JobStatus.FAILED,
+                failed_stage="RESULT_STORAGE",
+                error_code="RESULT_STORAGE_UNAVAILABLE",
                 error_message=str(e),
             )
             return
@@ -318,3 +344,18 @@ async def get_translation_job(job_id: str, db: Session = Depends(get_db)):
         error_code=translation_job.error_code,
         error_message=translation_job.error_message,
     )
+
+
+@router.get("/translate/jobs/{job_id}/video", include_in_schema=True)
+async def play_translation_result(job_id: str, db: Session = Depends(get_db)):
+    job_with_video = job_repository.get_translation_job_with_video_db(db, job_id)
+    if job_with_video is None:
+        raise HTTPException(status_code=404, detail="존재하지 않는 job_id입니다.")
+    translation_job, _ = job_with_video
+    if translation_job.status != JobStatus.COMPLETED.value or not translation_job.result_video_url:
+        raise HTTPException(status_code=404, detail="완료된 결과 영상이 없습니다.")
+    try:
+        url = create_result_download_url(job_id)
+    except ResultStorageUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return RedirectResponse(url=url, status_code=307)
