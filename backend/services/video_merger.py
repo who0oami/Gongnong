@@ -8,7 +8,10 @@ from pathlib import Path
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "static" / "results"
 IDLE_IMAGE_PATH = Path(__file__).resolve().parent.parent / "static" / "images" / "idle_pose.png"
 
-WIDTH, HEIGHT, FPS = 1920, 1080, 30
+# Render 무료 티어(0.1 vCPU)에서 1080p 인코딩은 사실상 끝나지 않는 수준으로 느려서,
+# 이 사양에서 합리적인 시간 내에 끝나도록 해상도를 낮춰뒀다. 더 강한 인스턴스로
+# 옮기면 다시 올려도 된다.
+WIDTH, HEIGHT, FPS = 640, 360, 30
 
 # ponytail: build_timeline()의 items에는 code만 있고 개별 클립의 재생 시간이
 # 없어서, 파일이 없는 avatar 항목을 얼마나 긴 검은 화면으로 대체해야 하는지
@@ -65,7 +68,7 @@ def _make_idle_pose(tmp: Path, duration: float, idx: int) -> Path:
 
 @measure_ffmpeg("normalize")
 def _normalize_clip(tmp: Path, src: Path, idx: int) -> Path:
-    """실제 클립을 1920x1080/30fps/무음으로 통일해서 concat이 가능하게 만든다."""
+    """실제 클립을 WIDTH x HEIGHT/FPS/무음으로 통일해서 concat이 가능하게 만든다."""
     out = tmp / f"norm_{idx}.mp4"
     vf = (
         f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
