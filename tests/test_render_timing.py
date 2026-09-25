@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
+from botocore.exceptions import ClientError
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 from routers import job
 from services import timing, clip_resolver as resolver, video_merger as merger
@@ -21,7 +23,10 @@ class RenderTimingTests(unittest.TestCase):
                 patch.dict(os.environ, S3_CLIP_BUCKET="test-bucket"), \
                 patch.object(resolver.boto3, "client") as factory, \
                 patch("builtins.print") as log:
-            factory.return_value.download_file.side_effect = [None, OSError("failure")]
+            factory.return_value.download_file.side_effect = [
+                None,
+                ClientError({"Error": {"Code": "404"}}, "GetObject"),
+            ]
             result = resolver.resolve_clips(items, Path(directory))
         self.assertIsNotNone(result["WORD0001"])
         self.assertIsNone(result["WORD0002"])
@@ -34,8 +39,9 @@ class RenderTimingTests(unittest.TestCase):
     def test_missing_bucket_is_not_counted_as_download_attempt(self):
         with tempfile.TemporaryDirectory() as directory, \
                 patch.dict(os.environ, S3_CLIP_BUCKET=""), patch("builtins.print") as log:
-            resolver.resolve_clips([avatar("WORD0001")], Path(directory))
-        self.assertIn("unique_words=1 downloads=0 success=0 failed=0", log.call_args.args[0])
+            with self.assertRaises(resolver.ClipStorageUnavailable):
+                resolver.resolve_clips([avatar("WORD0001")], Path(directory))
+        self.assertIn("downloads=0 success=0 failed=0", log.call_args.args[0])
 
     def test_probe_cache_and_missing_item_counters(self):
         items = [avatar("WORD0001"), avatar("WORD0001"), avatar("WORD0002")]
@@ -61,11 +67,11 @@ class RenderTimingTests(unittest.TestCase):
                 patch.object(merger, "_run_ffmpeg") as ffmpeg, patch("builtins.print") as log:
             result = merger.merge_timeline_to_video(timeline, "result.mp4", {"WORD0001": Path("source.mp4"), "WORD0002": None})
         self.assertEqual(result, "/static/results/result.mp4")
-        self.assertEqual(ffmpeg.call_count, 9)
+        self.assertEqual(ffmpeg.call_count, 8)
         self.assertEqual(log.call_count, 1)
         message = log.call_args.args[0]
-        for expected in ("normalize: count=2", "idle_pose: count=3", "black: count=3", "speed: count=1", "concat: count=3",
-                         "normalize_calls=2 normalize_unique_sources=1", "merge_total="):
+        for expected in ("normalize: count=1", "idle_pose: count=3", "black: count=3", "speed: count=1", "concat: count=3",
+                         "normalize_calls=1 normalize_unique_sources=1", "merge_total="):
             self.assertIn(expected, message)
         self.assertIsNone(timing.ffmpeg_metrics.get())
 

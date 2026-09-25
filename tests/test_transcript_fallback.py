@@ -22,7 +22,9 @@ class TranscriptFallbackTests(unittest.TestCase):
             {"start": 2.0, "end": 4.0, "text": "둘째 문장"},
         ]
         with patch.object(pipeline, "extract_video_id", return_value="video-id"), \
-                patch.object(pipeline, "get_video_metadata", return_value={"title": "", "description": ""}), \
+                patch.object(pipeline, "get_video_metadata", return_value={
+                    "title": "", "description": "", "duration_sec": 4.0,
+                }), \
                 patch.object(
                     pipeline,
                     "get_transcript_data",
@@ -36,7 +38,7 @@ class TranscriptFallbackTests(unittest.TestCase):
                 patch.object(pipeline, "correct_segments") as correct:
             result = pipeline.get_corrected_transcript_data("https://youtu.be/video-id")
 
-        fallback.assert_called_once_with("https://youtu.be/video-id")
+        fallback.assert_called_once_with("https://youtu.be/video-id", duration_sec=4.0)
         correct.assert_not_called()
         self.assertEqual(result["transcript"], "첫 문장 둘째 문장")
         self.assertEqual(
@@ -70,6 +72,26 @@ class TranscriptFallbackTests(unittest.TestCase):
             {"start": 3.0, "end": 5.0, "text": "둘째"},
         ])
         self.assertEqual(generate.call_count, 1)
+
+    def test_gemini_transcript_scales_timestamps_to_actual_duration(self):
+        response = Mock()
+        response.text = json.dumps({"segments": [
+            {"start": 0, "end": 2, "text": "first"},
+            {"start": 3, "end": 5, "text": "second"},
+        ]})
+        with patch.object(gemini_transcript, "generate_content", return_value=response):
+            _, segments = gemini_transcript.transcribe_youtube_video(
+                "https://youtu.be/video-id", duration_sec=4.0,
+            )
+        self.assertEqual(segments, [
+            {"start": 0.0, "end": 1.6, "text": "first"},
+            {"start": 2.4, "end": 4.0, "text": "second"},
+        ])
+
+    def test_youtube_duration_parser(self):
+        self.assertEqual(youtube_service._parse_youtube_duration("PT3M2S"), 182.0)
+        self.assertEqual(youtube_service._parse_youtube_duration("PT1H2M3.5S"), 3723.5)
+        self.assertIsNone(youtube_service._parse_youtube_duration("invalid"))
 
     def test_unexpected_transcript_error_marks_job_failed(self):
         with patch.object(job, "SessionLocal") as session, \

@@ -6,12 +6,26 @@ import re
 from pathlib import Path
 
 import boto3
-from botocore.exceptions import BotoCoreError, ClientError
+from botocore.exceptions import (
+    BotoCoreError,
+    ClientError,
+    NoCredentialsError,
+    PartialCredentialsError,
+    ProfileNotFound,
+)
 from boto3.exceptions import Boto3Error
 
 logger = logging.getLogger(__name__)
 # SEN only: its S3 key convention has not been defined yet.
 VIDEOS_DIR = Path(__file__).resolve().parent.parent / "static" / "videos"
+
+
+class ClipStorageUnavailable(RuntimeError):
+    """The configured avatar clip storage cannot be accessed."""
+
+
+def _client_error_code(exc: ClientError) -> str:
+    return str(exc.response.get("Error", {}).get("Code", ""))
 
 
 def resolve_clip_path(code: str, clip_paths: dict[str, Path | None]) -> Path | None:
@@ -26,7 +40,12 @@ def resolve_clips(display_sequence: list[dict], work_dir: Path) -> dict[str, Pat
         resolved: dict[str, Path | None] = {}
         bucket = os.getenv("S3_CLIP_BUCKET", "").strip()
         client = None
-        client_failed = False
+        has_word = any(
+            item.get("type") == "avatar" and re.fullmatch(r"WORD\d+", item.get("code", ""))
+            for item in display_sequence
+        )
+        if has_word and not bucket:
+            raise ClipStorageUnavailable("S3_CLIP_BUCKET이 설정되지 않았습니다.")
         for item in display_sequence:
             if item["type"] != "avatar":
                 continue
@@ -42,29 +61,38 @@ def resolve_clips(display_sequence: list[dict], work_dir: Path) -> dict[str, Pat
             if not re.fullmatch(r"WORD\d+", code):
                 continue
             stats.counts["unique_words"] += 1
-            if not bucket or client_failed:
-                logger.warning("Clip unavailable: %s (S3 bucket/client unavailable)", code)
-                continue
             path = work_dir / f"{code}.mp4"
             try:
                 if client is None:
                     try:
                         client = boto3.client("s3")  # Default AWS credential chain.
-                    except (BotoCoreError, ClientError, Boto3Error):
-                        client_failed = True
-                        raise
+                    except (BotoCoreError, ClientError, Boto3Error) as exc:
+                        stats.counts["failed"] += 1
+                        raise ClipStorageUnavailable(
+                            f"S3 클라이언트를 생성하지 못했습니다: {type(exc).__name__}"
+                        ) from exc
                 try:
                     with stats.measure("downloads"):
                         client.download_file(bucket, f"clips/word/{code}.mp4", str(path))
-                except BaseException:
+                except Exception:
                     stats.counts["failed"] += 1
                     raise
                 else:
                     stats.counts["success"] += 1
                 resolved[code] = path
-            except (BotoCoreError, ClientError, Boto3Error, OSError) as exc:
+            except ClientError as exc:
+                if _client_error_code(exc) not in {"404", "NoSuchKey", "NotFound"}:
+                    raise ClipStorageUnavailable(
+                        f"S3 클립 저장소에 접근하지 못했습니다: {_client_error_code(exc) or type(exc).__name__}"
+                    ) from exc
                 logger.warning("Clip download failed for %s: %s", code, type(exc).__name__)
                 path.unlink(missing_ok=True)
+            except (NoCredentialsError, PartialCredentialsError, ProfileNotFound,
+                    BotoCoreError, Boto3Error, OSError) as exc:
+                path.unlink(missing_ok=True)
+                raise ClipStorageUnavailable(
+                    f"S3 클립 저장소에 접근하지 못했습니다: {type(exc).__name__}"
+                ) from exc
         return resolved
     finally:
         emit_metrics("S3 Timing", f"avatar_items={stats.counts['avatar_items']} "

@@ -39,28 +39,38 @@ class JobClipTests(unittest.TestCase):
                 "ksl-tube-avatar-clips", "clips/word/WORD0001.mp4", str(path),
             )
 
-    def test_missing_object_and_failed_download_remove_partial_files(self):
-        for error in [ClientError({"Error": {"Code": "404"}}, "HeadObject"),
-                      NoCredentialsError(), OSError("download failed")]:
+    def test_missing_object_removes_partial_file_and_uses_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            def fail(bucket, key, path):
+                Path(path).write_bytes(b"partial")
+                raise ClientError({"Error": {"Code": "404"}}, "HeadObject")
+            self.client.download_file.side_effect = fail
+            paths = resolver.resolve_clips([ITEM, ITEM], Path(directory))
+            self.assertEqual(paths, {"WORD0001": None})
+            self.assertEqual(list(Path(directory).iterdir()), [])
+            self.assertEqual(job._get_clip_duration("WORD0001", paths), 1.0)
+
+    def test_storage_errors_fail_fast_and_remove_partial_files(self):
+        for error in [NoCredentialsError(), OSError("download failed")]:
             with self.subTest(error=error), tempfile.TemporaryDirectory() as directory:
                 def fail(bucket, key, path):
                     Path(path).write_bytes(b"partial")
                     raise error
                 self.client.download_file.reset_mock()
                 self.client.download_file.side_effect = fail
-                paths = resolver.resolve_clips([ITEM, ITEM], Path(directory))
-                self.assertEqual(paths, {"WORD0001": None})
+                with self.assertRaises(resolver.ClipStorageUnavailable):
+                    resolver.resolve_clips([ITEM], Path(directory))
                 self.assertEqual(list(Path(directory).iterdir()), [])
-                self.client.download_file.assert_called_once()
-                self.assertEqual(job._get_clip_duration("WORD0001", paths), 1.0)
 
     def test_missing_bucket_and_client_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             with patch.dict(os.environ, S3_CLIP_BUCKET=""):
-                self.assertEqual(resolver.resolve_clips([ITEM], Path(directory)), {"WORD0001": None})
+                with self.assertRaises(resolver.ClipStorageUnavailable):
+                    resolver.resolve_clips([ITEM], Path(directory))
             self.factory.assert_not_called()
             self.factory.side_effect = NoCredentialsError()
-            self.assertEqual(resolver.resolve_clips([ITEM], Path(directory)), {"WORD0001": None})
+            with self.assertRaises(resolver.ClipStorageUnavailable):
+                resolver.resolve_clips([ITEM], Path(directory))
 
     def test_sen_keeps_legacy_lookup_without_s3(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(resolver, "VIDEOS_DIR", Path(directory)):
@@ -97,7 +107,7 @@ class JobClipTests(unittest.TestCase):
                 patch.object(merger, "_run_ffmpeg"):
             self.assertEqual(job._render_job_video("test", SEGMENTS), "/static/results/test.mp4")
             probe_mock.assert_called_once()
-            self.assertEqual(norm.call_count, 2)
+            self.assertEqual(norm.call_count, 1)
         self.client.download_file.assert_called_once()
         self.assertFalse(downloaded[0].parent.exists())
 
@@ -133,16 +143,12 @@ class JobClipTests(unittest.TestCase):
         self.assertNotEqual(paths[0], paths[1])
         self.assertTrue(all(not path.parent.exists() for path in paths))
 
-    def test_download_failure_reaches_merger_fallback(self):
+    def test_download_auth_failure_does_not_start_merger(self):
         self.client.download_file.side_effect = NoCredentialsError()
-        with tempfile.TemporaryDirectory() as results, \
-                patch.object(merger, "RESULTS_DIR", Path(results)), \
-                patch.object(job.subprocess, "run") as probe, \
-                patch.object(merger, "_make_idle_pose", return_value=Path(results) / "idle.mp4") as idle, \
-                patch.object(merger, "_run_ffmpeg"):
-            job._render_job_video("fallback", SEGMENTS)
-            probe.assert_not_called()
-            self.assertEqual(idle.call_count, 2)
+        with patch.object(job, "merge_timeline_to_video") as merge:
+            with self.assertRaises(resolver.ClipStorageUnavailable):
+                job._render_job_video("fallback", SEGMENTS)
+            merge.assert_not_called()
 
 
 if __name__ == "__main__":

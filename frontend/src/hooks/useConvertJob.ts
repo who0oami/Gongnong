@@ -9,11 +9,13 @@ const JOB_ID_KEY = "gongnong_active_job_id";
 // TODO: swap this interval-based polling for SSE/WebSocket once the backend confirms which
 // transport it supports for job status updates — only this hook should need to change.
 const POLL_INTERVAL_MS = 2000;
+const MAX_CONSECUTIVE_POLL_FAILURES = 3;
 
 export function useConvertJob() {
   const [job, setJob] = useState<ConvertJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<number | undefined>(undefined);
+  const pollFailuresRef = useRef(0);
 
   const stopPolling = useCallback(() => {
     window.clearInterval(pollRef.current);
@@ -23,6 +25,7 @@ export function useConvertJob() {
   const poll = useCallback(
     (jobId: string) => {
       stopPolling();
+      pollFailuresRef.current = 0;
       let fetching = false;
       const interval = window.setInterval(async () => {
         if (fetching) return;
@@ -30,6 +33,8 @@ export function useConvertJob() {
         try {
           const latest = await videoApi.getJobStatus(jobId);
           if (pollRef.current !== interval) return;
+          pollFailuresRef.current = 0;
+          setError(null);
           setJob(latest);
           if (latest.status === "COMPLETED" || latest.status === "FAILED") {
             stopPolling();
@@ -37,8 +42,11 @@ export function useConvertJob() {
           }
         } catch (err) {
           if (pollRef.current !== interval) return;
-          setError(err instanceof ApiError ? err.message : "상태 조회에 실패했습니다.");
-          stopPolling();
+          pollFailuresRef.current += 1;
+          if (pollFailuresRef.current >= MAX_CONSECUTIVE_POLL_FAILURES) {
+            setError(err instanceof ApiError ? err.message : "상태 조회에 연속으로 실패했습니다.");
+            stopPolling();
+          }
         } finally {
           fetching = false;
         }

@@ -1,7 +1,7 @@
 from datetime import datetime
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from models.transcript_segment import TranscriptSegment
@@ -10,6 +10,33 @@ from models.video import Video
 from schemas.job import Job, JobSegment, JobStatus
 
 _jobs: dict[str, Job] = {}
+
+
+def fail_incomplete_jobs_created_before(db: Session, before: datetime) -> int:
+    """Mark work abandoned by a previous web process as failed."""
+    incomplete = [
+        JobStatus.QUEUED.value,
+        JobStatus.TRANSCRIPTING.value,
+        JobStatus.KSL_CONVERTING.value,
+        JobStatus.SIGN_MAPPING.value,
+        JobStatus.TIMELINE_BUILDING.value,
+    ]
+    statement = (
+        update(TranslationJob)
+        .where(
+            TranslationJob.status.in_(incomplete),
+            TranslationJob.created_at < before,
+        )
+        .values(
+            status=JobStatus.FAILED.value,
+            failed_stage="SERVER_RESTART",
+            error_code="SERVER_RESTARTED",
+            error_message="서버가 재시작되어 이전 변환 작업이 중단되었습니다. 다시 시도해 주세요.",
+        )
+    )
+    result = db.execute(statement)
+    db.commit()
+    return int(result.rowcount or 0)
 
 
 def get_or_create_video_db(

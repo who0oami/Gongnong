@@ -39,12 +39,19 @@ _PROMPT = """이 공개 YouTube 영상의 한국어 음성을 빠짐없이 전�
 말이 없는 구간은 제외하고 JSON 스키마만 반환하세요."""
 
 
-def transcribe_youtube_video(url: str) -> tuple[str, list[dict]]:
+def transcribe_youtube_video(
+    url: str,
+    *,
+    duration_sec: float | None = None,
+) -> tuple[str, list[dict]]:
     """Transcribe a public YouTube URL through Gemini with timestamped segments."""
     model = os.getenv("GEMINI_TRANSCRIPT_MODEL", _DEFAULT_MODEL).strip() or _DEFAULT_MODEL
+    prompt = _PROMPT
+    if duration_sec is not None and math.isfinite(duration_sec) and duration_sec > 0:
+        prompt += f"\n영상의 실제 길이는 {duration_sec:.3f}초입니다. 모든 end 값은 이 길이를 넘지 마세요."
     contents = types.Content(parts=[
         types.Part(file_data=types.FileData(file_uri=url)),
-        types.Part(text=_PROMPT),
+        types.Part(text=prompt),
     ])
     response = generate_content(
         model=model,
@@ -93,5 +100,18 @@ def transcribe_youtube_video(url: str) -> tuple[str, list[dict]]:
     segments.sort(key=lambda segment: (segment["start"], segment["end"]))
     if not segments:
         raise ValueError("Gemini가 유효한 영상 자막 구간을 생성하지 못했습니다.")
+
+    if duration_sec is not None and math.isfinite(duration_sec) and duration_sec > 0:
+        max_end = max(segment["end"] for segment in segments)
+        scale = duration_sec / max_end if max_end > duration_sec else 1.0
+        normalized = []
+        for segment in segments:
+            start = round(min(duration_sec, max(0.0, segment["start"] * scale)), 3)
+            end = round(min(duration_sec, max(start, segment["end"] * scale)), 3)
+            if end > start:
+                normalized.append({**segment, "start": start, "end": end})
+        segments = normalized
+        if not segments:
+            raise ValueError("Gemini 영상 자막 시간이 실제 영상 길이와 맞지 않습니다.")
 
     return " ".join(segment["text"] for segment in segments), segments

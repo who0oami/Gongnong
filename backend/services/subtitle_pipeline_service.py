@@ -26,7 +26,10 @@ def get_corrected_transcript_data(url: str) -> dict:
             transcript, segments = get_transcript_data(video_id)
         except TranscriptAccessBlocked:
             print("[Transcript] YouTube 서버 접근 차단 - Gemini 영상 전사로 대체", flush=True)
-            transcript, segments = transcribe_youtube_video(url)
+            transcript, segments = transcribe_youtube_video(
+                url,
+                duration_sec=metadata.get("duration_sec"),
+            )
             used_gemini_transcript = True
     if used_gemini_transcript:
         corrected_segments = [

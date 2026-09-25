@@ -1,6 +1,7 @@
 from services.timing import measure_ffmpeg, profile_merge
 
 import itertools
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -22,12 +23,23 @@ MISSING_CLIP_FALLBACK_SECONDS = 1.0
 _GAP_EPSILON = 1e-3
 
 
+def _ffmpeg_timeout_seconds() -> int:
+    try:
+        return max(30, int(os.getenv("FFMPEG_TIMEOUT_SECONDS", "600")))
+    except ValueError:
+        return 600
+
+
 def _run_ffmpeg(args: list[str]) -> None:
-    result = subprocess.run(
-        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *args],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *args],
+            capture_output=True,
+            text=True,
+            timeout=_ffmpeg_timeout_seconds(),
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("ffmpeg 작업 시간이 제한을 초과했습니다.") from exc
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg failed: {' '.join(args)}\n{result.stderr}")
 
@@ -38,7 +50,7 @@ def _make_black(tmp: Path, duration: float, idx: int) -> Path:
     _run_ffmpeg([
         "-f", "lavfi",
         "-i", f"color=c=black:s={WIDTH}x{HEIGHT}:r={FPS}:d={duration:.3f}",
-        "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        "-an", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "1", "-pix_fmt", "yuv420p",
         str(out),
     ])
     return out
@@ -60,7 +72,7 @@ def _make_idle_pose(tmp: Path, duration: float, idx: int) -> Path:
     )
     _run_ffmpeg([
         "-loop", "1", "-i", str(IDLE_IMAGE_PATH), "-t", f"{duration:.3f}",
-        "-vf", vf, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        "-vf", vf, "-an", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "1", "-pix_fmt", "yuv420p",
         str(out),
     ])
     return out
@@ -76,7 +88,7 @@ def _normalize_clip(tmp: Path, src: Path, idx: int) -> Path:
     )
     _run_ffmpeg([
         "-i", str(src),
-        "-vf", vf, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        "-vf", vf, "-an", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "1", "-pix_fmt", "yuv420p",
         str(out),
     ])
     return out
@@ -87,7 +99,7 @@ def _apply_speed(tmp: Path, src: Path, speed: float, idx: int) -> Path:
     out = tmp / f"speed_{idx}.mp4"
     _run_ffmpeg([
         "-i", str(src),
-        "-vf", f"setpts=PTS/{speed}", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        "-vf", f"setpts=PTS/{speed}", "-an", "-c:v", "libx264", "-preset", "ultrafast", "-threads", "1", "-pix_fmt", "yuv420p",
         str(out),
     ])
     return out
@@ -118,6 +130,7 @@ def merge_timeline_to_video(
     with tempfile.TemporaryDirectory(prefix="video_merger_") as tmp_str:
         tmp = Path(tmp_str)
         master_parts: list[Path] = []
+        normalized_clips: dict[Path, Path] = {}
         prev_end = 0.0
 
         for segment in timeline:
@@ -134,7 +147,9 @@ def merge_timeline_to_video(
                 if src is None:
                     item_parts.append(_make_idle_pose(tmp, MISSING_CLIP_FALLBACK_SECONDS, next(counter)))
                 else:
-                    item_parts.append(_normalize_clip(tmp, src, next(counter)))
+                    if src not in normalized_clips:
+                        normalized_clips[src] = _normalize_clip(tmp, src, next(counter))
+                    item_parts.append(normalized_clips[src])
 
             seg_base = None
             if item_parts:

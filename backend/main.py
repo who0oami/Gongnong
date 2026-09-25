@@ -1,3 +1,7 @@
+from contextlib import asynccontextmanager
+from datetime import datetime
+import logging
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -5,9 +9,29 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from routers import youtube, job, auth, history
+from database import SessionLocal
+from services.job_repository import fail_incomplete_jobs_created_before
+
+logger = logging.getLogger(__name__)
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    started_at = datetime.now()
+    db = SessionLocal()
+    try:
+        recovered = fail_incomplete_jobs_created_before(db, started_at)
+        if recovered:
+            logger.warning("Marked %s abandoned translation jobs as failed", recovered)
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to reconcile abandoned translation jobs")
+    finally:
+        db.close()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")

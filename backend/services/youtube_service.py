@@ -99,7 +99,27 @@ def extract_video_id(url: str) -> str | None:
     return None
 
 
-def get_video_metadata(url: str) -> dict[str, str]:
+def _parse_youtube_duration(value: str | None) -> float | None:
+    """Convert an ISO-8601 YouTube duration (for example PT3M2S) to seconds."""
+    if not value:
+        return None
+    match = re.fullmatch(
+        r"P(?:(?P<days>\d+)D)?T(?:(?P<hours>\d+)H)?(?:(?P<minutes>\d+)M)?(?:(?P<seconds>\d+(?:\.\d+)?)S)?",
+        value,
+    )
+    if match is None:
+        return None
+    parts = {name: float(number or 0) for name, number in match.groupdict().items()}
+    duration = (
+        parts["days"] * 86400
+        + parts["hours"] * 3600
+        + parts["minutes"] * 60
+        + parts["seconds"]
+    )
+    return duration if duration > 0 else None
+
+
+def get_video_metadata(url: str) -> dict[str, str | float | None]:
     """YouTube Data API를 사용해 영상 제목과 설명을 조회한다."""
 
     api_key = os.getenv("YOUTUBE_API_KEY")
@@ -109,6 +129,7 @@ def get_video_metadata(url: str) -> dict[str, str]:
         return {
             "title": "",
             "description": "",
+            "duration_sec": None,
         }
 
     video_id = extract_video_id(url)
@@ -121,6 +142,7 @@ def get_video_metadata(url: str) -> dict[str, str]:
         return {
             "title": "",
             "description": "",
+            "duration_sec": None,
         }
 
     try:
@@ -131,7 +153,7 @@ def get_video_metadata(url: str) -> dict[str, str]:
         )
 
         response = youtube.videos().list(
-            part="snippet",
+            part="snippet,contentDetails",
             id=video_id,
         ).execute()
 
@@ -145,13 +167,16 @@ def get_video_metadata(url: str) -> dict[str, str]:
             return {
                 "title": "",
                 "description": "",
+                "duration_sec": None,
             }
 
         snippet = items[0].get("snippet", {})
+        content_details = items[0].get("contentDetails", {})
 
         return {
             "title": snippet.get("title") or "",
             "description": snippet.get("description") or "",
+            "duration_sec": _parse_youtube_duration(content_details.get("duration")),
         }
 
     except Exception as e:
@@ -163,6 +188,7 @@ def get_video_metadata(url: str) -> dict[str, str]:
         return {
             "title": "",
             "description": "",
+            "duration_sec": None,
         }
 
 

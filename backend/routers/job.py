@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import subprocess
 import tempfile
 from datetime import datetime
@@ -20,7 +21,7 @@ from services.subtitle_pipeline_service import get_corrected_transcript_data
 from services.demo_gloss_override import DEMO_GLOSS_OVERRIDE, build_display_sequence_from_codes
 from services.ksl_converter import KSLConversionError
 from services.llm_gloss_service import GeminiKSLConverter, get_gloss_batch_size
-from services.clip_resolver import resolve_clip_path, resolve_clips
+from services.clip_resolver import ClipStorageUnavailable, resolve_clip_path, resolve_clips
 from services.gloss_matcher import build_display_sequence
 from services.timeline_builder import build_timeline
 from services.video_merger import merge_timeline_to_video, MISSING_CLIP_FALLBACK_SECONDS
@@ -28,6 +29,14 @@ from services.video_merger import merge_timeline_to_video, MISSING_CLIP_FALLBACK
 router = APIRouter()
 logger = logging.getLogger(__name__)
 ksl_converter: GeminiKSLConverter = GeminiKSLConverter()
+_render_semaphore = asyncio.Semaphore(1)
+
+
+def _ffprobe_timeout_seconds() -> int:
+    try:
+        return max(10, int(os.getenv("FFPROBE_TIMEOUT_SECONDS", "30")))
+    except ValueError:
+        return 30
 
 
 def _get_clip_duration(code: str, clip_paths: dict[str, Path | None]) -> float:
@@ -41,6 +50,7 @@ def _get_clip_duration(code: str, clip_paths: dict[str, Path | None]) -> float:
             ["ffprobe", "-v", "error", "-show_entries", "format=duration",
              "-of", "default=noprint_wrappers=1:nokey=1", str(clip_path)],
             capture_output=True, text=True, check=True,
+            timeout=_ffprobe_timeout_seconds(),
         )
     return float(probe.stdout.strip())
 
@@ -61,6 +71,8 @@ def _render_job_video(job_id: str, segments: list[dict]) -> str:
                     [item for seg in prepared for item in seg["display_sequence"]], Path(temp_dir),
                 )
             avatar_items = [item for seg in prepared for item in seg["display_sequence"] if item["type"] == "avatar"]
+            if avatar_items and not any(clip_paths.get(item["code"]) is not None for item in avatar_items):
+                raise ClipStorageUnavailable("매핑된 수어 영상 클립을 하나도 불러오지 못했습니다.")
             emit_metrics("Render Stats", f"segments={len(prepared)} avatar_items={len(avatar_items)} "
                          f"unique_avatar_codes={len({item['code'] for item in avatar_items})} "
                          f"missing_clips={sum(clip_paths.get(item['code']) is None for item in avatar_items)}", job_id)
@@ -196,12 +208,24 @@ async def process_job(job_id: str, url: str) -> None:
         # The render worker maps and downloads clips before timeline calculation.
         job_repository.update_translation_job_db(db, job_id, status=JobStatus.SIGN_MAPPING)
 
-        job_repository.update_translation_job_db(db, job_id, status=JobStatus.TIMELINE_BUILDING)
-
         try:
-            video_url = await asyncio.to_thread(
-                _render_job_video, job_id, timeline_segments,
+            async with _render_semaphore:
+                job_repository.update_translation_job_db(
+                    db, job_id, status=JobStatus.TIMELINE_BUILDING,
+                )
+                video_url = await asyncio.to_thread(
+                    _render_job_video, job_id, timeline_segments,
+                )
+        except ClipStorageUnavailable as e:
+            job_repository.update_translation_job_db(
+                db,
+                job_id,
+                status=JobStatus.FAILED,
+                failed_stage="SIGN_MAPPING",
+                error_code="CLIP_STORAGE_UNAVAILABLE",
+                error_message=str(e),
             )
+            return
         except Exception as e:
             job_repository.update_translation_job_db(
                 db,
