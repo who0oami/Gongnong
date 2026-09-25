@@ -39,6 +39,30 @@ class JobClipTests(unittest.TestCase):
                 "ksl-tube-avatar-clips", "clips/word/WORD0001.mp4", str(path),
             )
 
+    def test_explicit_deploy_credentials_ignore_local_profile(self):
+        explicit_client = Mock()
+        explicit_client.download_file.side_effect = (
+            lambda bucket, key, path: Path(path).write_bytes(b"clip")
+        )
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {
+            "AWS_PROFILE": "missing-local-profile",
+            "AWS_ACCESS_KEY_ID": "test-access",
+            "AWS_SECRET_ACCESS_KEY": "test-secret",
+            "AWS_DEFAULT_REGION": "ap-northeast-2",
+        }), patch.object(resolver.boto3, "Session") as session:
+            session.return_value.client.return_value = explicit_client
+            paths = resolver.resolve_clips([ITEM], Path(directory))
+
+        self.assertIsNotNone(paths["WORD0001"])
+        session.assert_called_once_with(
+            aws_access_key_id="test-access",
+            aws_secret_access_key="test-secret",
+            aws_session_token=None,
+            region_name="ap-northeast-2",
+        )
+        session.return_value.client.assert_called_once_with("s3")
+        self.factory.assert_not_called()
+
     def test_missing_object_removes_partial_file_and_uses_fallback(self):
         with tempfile.TemporaryDirectory() as directory:
             def fail(bucket, key, path):

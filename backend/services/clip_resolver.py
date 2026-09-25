@@ -28,6 +28,21 @@ def _client_error_code(exc: ClientError) -> str:
     return str(exc.response.get("Error", {}).get("Code", ""))
 
 
+def _create_s3_client():
+    """Prefer explicit deploy credentials so an accidental local profile cannot shadow them."""
+    access_key = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
+    secret_key = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
+    if access_key and secret_key:
+        session = boto3.Session(
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            aws_session_token=os.getenv("AWS_SESSION_TOKEN") or None,
+            region_name=os.getenv("AWS_DEFAULT_REGION") or None,
+        )
+        return session.client("s3")
+    return boto3.client("s3")
+
+
 def resolve_clip_path(code: str, clip_paths: dict[str, Path | None]) -> Path | None:
     """Read the prepared job mapping without downloading or rebuilding paths."""
     return clip_paths.get(code)
@@ -65,12 +80,14 @@ def resolve_clips(display_sequence: list[dict], work_dir: Path) -> dict[str, Pat
             try:
                 if client is None:
                     try:
-                        client = boto3.client("s3")  # Default AWS credential chain.
+                        client = _create_s3_client()
                     except (BotoCoreError, ClientError, Boto3Error) as exc:
                         stats.counts["failed"] += 1
-                        raise ClipStorageUnavailable(
-                            f"S3 클라이언트를 생성하지 못했습니다: {type(exc).__name__}"
-                        ) from exc
+                        if isinstance(exc, ProfileNotFound):
+                            message = "Render의 AWS_PROFILE을 삭제하고 AWS Access Key 환경 변수를 설정해 주세요."
+                        else:
+                            message = f"S3 클라이언트를 생성하지 못했습니다: {type(exc).__name__}"
+                        raise ClipStorageUnavailable(message) from exc
                 try:
                     with stats.measure("downloads"):
                         client.download_file(bucket, f"clips/word/{code}.mp4", str(path))
