@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
-from youtube_transcript_api._errors import RequestBlocked
+from youtube_transcript_api._errors import NoTranscriptFound, RequestBlocked
 
 from routers import job
 from services import gemini_transcript_service as gemini_transcript
@@ -49,6 +49,14 @@ class TranscriptFallbackTests(unittest.TestCase):
     def test_youtube_block_is_exposed_as_specific_value_error(self):
         with patch.object(youtube_service, "YouTubeTranscriptApi") as api:
             api.return_value.fetch.side_effect = RequestBlocked("video-id")
+            with self.assertRaises(youtube_service.TranscriptAccessBlocked):
+                youtube_service.get_transcript_data("video-id")
+
+    def test_missing_caption_also_uses_audio_transcription_fallback(self):
+        with patch.object(youtube_service, "YouTubeTranscriptApi") as api:
+            api.return_value.fetch.side_effect = NoTranscriptFound(
+                "video-id", ["ko"], {},
+            )
             with self.assertRaises(youtube_service.TranscriptAccessBlocked):
                 youtube_service.get_transcript_data("video-id")
 

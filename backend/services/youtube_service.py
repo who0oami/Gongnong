@@ -278,27 +278,21 @@ def get_transcript_data(video_id: str) -> tuple[str, list[dict]]:
             languages=["ko"],
         )
 
-    except (
-        TranscriptsDisabled,
-        NoTranscriptFound,
-    ):
-        raise ValueError(
-            "이 영상에서 한국어 자막을 찾을 수 없습니다."
-        )
-
     except VideoUnavailable:
         raise ValueError(
             "존재하지 않거나 재생할 수 없는 영상입니다."
         )
 
-    except (RequestBlocked, IpBlocked) as exc:
+    except (RequestBlocked, IpBlocked, TranscriptsDisabled, NoTranscriptFound) as exc:
         raise TranscriptAccessBlocked(
-            "서버 네트워크에서 YouTube 자막 접근이 차단되었습니다."
+            "YouTube 자막을 직접 가져올 수 없어 영상 음성 전사로 대체합니다."
         ) from exc
 
     except YouTubeTranscriptApiException as exc:
         logger.warning("YouTube 자막 조회 실패 (%s)", type(exc).__name__)
-        raise ValueError("YouTube 자막을 가져오지 못했습니다.") from exc
+        raise TranscriptAccessBlocked(
+            "YouTube 자막 조회가 실패하여 영상 음성 전사로 대체합니다."
+        ) from exc
 
     segments = group_into_sentences(transcript)
 
