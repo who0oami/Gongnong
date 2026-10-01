@@ -1,171 +1,144 @@
-# KSL-Tube 인수인계 및 실행 가이드
+# 공농 (Gongnong)
 
-YouTube 자막을 한국수어(KSL) Gloss로 변환하고 아바타 클립을 합성하는 서비스입니다. 이 문서는 `jihyun/local-llm-s3-integration`의 통합 코드를 기준으로 합니다. 팀원의 Convert·S3·DB 코드에 Local LLM 의미 검증과 캡션 처리를 합쳤으며, 실제 공용 서비스 E2E 성공을 뜻하지는 않습니다.
+> AI 기반 YouTube 한국수어 영상 변환 서비스
 
-## 1. 현재 구현 상태
+YouTube URL을 입력하면 영상의 자막·음성을 분석해 한국수어(KSL) Gloss로 변환하고, 수어 Avatar 클립을 원본 타이밍에 맞춰 합성하는 콘텐츠 접근성 프로젝트입니다.
 
-- **Frontend ↔ Backend 연동 완료**: React/Vite에서 FastAPI의 인증, 온보딩, 번역 Job 생성·조회, 결과 영상 재생, History API를 호출합니다. 전체 외부 서비스 E2E 재검증은 남아 있습니다.
-- **공용 DB는 Supabase PostgreSQL**이며 SQLAlchemy로 접근하고 **Alembic으로 schema를 관리**합니다. SQLite는 격리 테스트용입니다.
-- Gemini는 YouTube 자막의 **문맥·맞춤법·ASR 오인식 보정**에 사용합니다. 영상 제목·설명과 전체 자막을 함께 전달하고 원문·시간 구간을 유지하며 `corrected_text`를 저장합니다. 교정 호출 실패 시 원문으로 진행합니다.
-- **Gloss 변환은 기본 Ollama/Qwen**입니다. `ConfiguredKSLConverter`가 `KSL_GLOSS_PROVIDER` 설정에 따라 교정 문장을 변환합니다. 일부 데모 문장은 `demo_gloss_override.py`의 고정 코드로 대체되므로 실제 모델 평가 시 구분합니다.
-- 의미 검증 실패는 해당 구간 캡션으로 복구하고, 일반 미매칭 단어는 매칭된 클립과 함께 캡션으로 표시합니다. 모델 통신 실패는 Job 실패로 처리합니다.
+## 담당 작업
 
-현재 일반 변환 흐름:
+### AI · 3D Avatar
 
-```text
-YouTube 자막 → Gemini 자막 교정 → Ollama/Qwen Gloss → WORD/SEN 코드 매핑
-→ S3 WORD 클립 다운로드 → 타임라인 구성 → FFmpeg → 결과 영상
-```
+- 기존 3D 수어 데이터를 가공해 손 모양 보정용 학습 데이터셋 구축
+- 합성 노이즈와 실제 추출–정답 Pair 기반 손 모션 학습 데이터 제작
+- BiGRU 손 모션 디노이저 학습 및 KNN 방식과 성능 비교
+- 1,500개 수어 단어·약 21.6만 손 프레임 기반 KNN 손 모양 보정 구현
+- 기존 약 3,000개 수어 Asset에 없던 자음 18종(`WORD3002`~`WORD3019`)의 신규 Avatar Asset 제작
+- 자음 18종·1,454프레임의 Baseline/KNN/손가락 방향 보정 결과 비교 및 Blender 렌더링 검증
+- F10·F20 VRM Avatar 리타게팅과 손가락 방향·회전 보정
+- 키포인트 보정부터 Avatar 생성·렌더링까지 One-shot 실행 자동화
 
-클립 공급 경로:
+### KSL Gloss · Local AI
 
-```text
-WORD → S3 / SEN → 로컬 파일 → FFmpeg
-```
+- Ollama/Qwen 기반 Local LLM 한국어–KSL Gloss 변환 및 프롬프트 개선
+- 의미 검증, 조사·부정 표현 정규화, 미매칭 단어 캡션 처리 구현
+- Local LLM–Gloss Matcher–S3 수어 영상 연결 실험
+- mT5 기반 한국어–KSL Gloss 저메모리 파인튜닝·평가 파이프라인 구축
+- 저장된 mT5 모델 재로딩과 Gloss token F1 기준 검증 구현
+- Gemini·Local LLM·mT5 변환기를 환경변수로 선택할 수 있도록 Backend 통합
 
-## 2. 준비 사항
+### Frontend · Backend 배포 및 최적화
 
-| 시스템 의존성 | 용도 / 기준 |
+- Vercel Frontend·Render Backend 배포와 실제 서비스 E2E 검증
+- Render의 YouTube 자막 조회 차단 시 Gemini가 영상 음성을 직접 전사하는 Fallback 구현
+- Render 환경변수 기반 AWS 인증과 S3 수어 클립 조회 연동
+- Vercel SPA `/processing` 직접 접근·새로고침 404 문제 해결
+- FFmpeg 구간 묶음 처리, 메타데이터 캐시, 메모리 옵션 최적화
+- 약 3분 영상 변환 시간을 Render 무료 인스턴스 기준 약 33분에서 **8분 27초**로 단축
+- 결과 MP4를 S3에 영구 저장하고 서명 URL로 Frontend에서 재생하도록 구현
+
+## 핵심 성과
+
+| 항목 | 결과 |
 | --- | --- |
-| Python 3.10 | 백엔드 및 Alembic 실행, 가상환경 사용 |
-| Node.js / npm | 프런트엔드 설치·실행. 현재 설치된 Vite 8의 engines 기준 Node.js `^20.19.0` 또는 `>=22.12.0` |
-| Git | 브랜치 clone 및 협업 |
-| FFmpeg / ffprobe | 길이 측정·합성. 둘 다 PATH 등록, `libx264` 사용 가능 빌드 필요 |
-| AWS CLI | 로컬 S3 인증·접근 확인용. 백엔드 다운로드는 boto3 사용 |
-| PostgreSQL libpq 또는 psycopg binary extra | PostgreSQL 드라이버 로딩에 필요. 아래 설치 안내 참고 |
-| Ollama | 기본 Gloss 변환 실행용. `ollama pull qwen2.5:3b`로 모델 준비 |
+| 영상 변환 속도 | 약 33분 → **8분 27초** |
+| 신규 수어 Asset | 미지원 자음 **18종** 제작 |
+| KNN 기준 데이터 | 수어 1,500단어·손 프레임 약 21.6만 개 |
+| 배포 구성 | Vercel · Render · Supabase · AWS S3 E2E 연결 |
+| 결과 보존 | Render 재배포 후에도 S3 결과 영상 재생 가능 |
 
-팀의 보안 채널로 Supabase 연결 정보, Gemini API key, AWS 접근 권한을 전달받습니다. 실제 비밀번호와 키는 문서·Git·프런트엔드 환경변수에 넣지 않습니다.
+## 서비스 흐름
 
-## 3. Clone 및 Python 설치
-
-아래 clone 명령은 통합 브랜치가 원격에 게시된 뒤 사용합니다. 아직 로컬 작업 중이면 해당 worktree에서 이어서 실행합니다.
-
-```bash
-git clone --branch jihyun/local-llm-s3-integration https://github.com/ssica16/ksl-tube.git
-cd ksl-tube
+```mermaid
+flowchart LR
+    A[YouTube URL] --> B[자막 조회]
+    B -->|조회 차단·자막 없음| C[Gemini 영상 전사]
+    B --> D[자막 교정·Segment 처리]
+    C --> D
+    D --> E[한국어 → KSL Gloss]
+    E --> F[WORD/SEN Asset 매핑]
+    F --> G[S3 수어 클립 조회]
+    G --> H[Timeline 계산]
+    H --> I[FFmpeg 영상 합성]
+    I --> J[S3 결과 저장]
+    J --> K[Frontend 동기화 재생]
 ```
 
-Windows PowerShell:
+배포 환경의 기본 Gloss 변환기는 Gemini입니다. Local LLM과 mT5는 비교·검증을 위해 선택 가능한 실험 경로로 통합했습니다.
 
-```powershell
-py -3.10 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-Copy-Item .env.example .env
-Copy-Item frontend/.env.example frontend/.env.local
+## 기술 스택
+
+| 영역 | 기술 |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite, React Router, Tailwind CSS |
+| Backend | FastAPI, SQLAlchemy, Alembic, Uvicorn |
+| AI | Gemini API, Ollama/Qwen, mT5, BiGRU, KNN |
+| 3D Avatar | MediaPipe, Blender, VRM |
+| Video | FFmpeg, ffprobe |
+| Data · Storage | Supabase PostgreSQL, AWS S3 |
+| Deployment | Vercel, Render, Docker |
+
+## 프로젝트 구조
+
+```text
+Gongnong/
+├── frontend/       # React SPA
+├── backend/        # FastAPI 및 영상 변환 파이프라인
+├── ai/             # mT5 학습·추론 코드
+├── experiments/    # KNN Avatar·Local LLM 검증 코드
+├── data/           # WORD/SEN·감정 단어 매핑 데이터
+├── alembic/        # DB migration
+├── tests/          # Backend 테스트
+└── Dockerfile      # Render 배포 이미지
 ```
 
-macOS / Linux:
+주요 실험 자료:
+
+- [`experiments/consonants_knn_jihyeon_v1/`](experiments/consonants_knn_jihyeon_v1/): KNN 손 보정·자음 Avatar·Blender 렌더링
+- [`experiments/local_llm_validation/`](experiments/local_llm_validation/): Local LLM 의미 검증·S3 연결 실험
+- [`ai/`](ai/): mT5 파인튜닝·저장 모델 검증·Backend 추론
+
+모델 가중치, 원본 학습 영상, S3 수어 클립은 저장소에 포함하지 않습니다.
+
+## 로컬 실행
+
+### 요구 사항
+
+- Python 3.10 이상
+- Node.js 20.19 이상 또는 22.12 이상
+- FFmpeg / ffprobe
+- PostgreSQL 또는 Supabase
+- Gemini API Key
+- AWS S3 접근 권한
+
+### 설치
 
 ```bash
-python3.10 -m venv .venv
+git clone https://github.com/who0oami/Gongnong.git
+cd Gongnong
+
+python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+
 cp .env.example .env
 cp frontend/.env.example frontend/.env.local
 ```
 
-기존 환경 파일이 있다면 덮어쓰지 말고 예제와 비교하여 필요한 항목만 추가합니다.
+Windows에서는 `.venv\Scripts\Activate.ps1`로 가상환경을 활성화합니다.
 
-Windows PowerShell 실행 정책으로 `Activate.ps1`이 차단되면 명령 프롬프트(cmd)에서 `.venv\Scripts\activate.bat`로 활성화한 뒤 진행할 수 있습니다. `npm.ps1`이 차단되면 `npm` 대신 `npm.cmd`를 사용합니다(예: `npm.cmd install`, `npm.cmd run dev`, `npm.cmd run build`).
-
-`requirements.txt`에는 FastAPI, Uvicorn, SQLAlchemy, Alembic, psycopg, boto3, google-genai, YouTube 자막 추출, JWT/비밀번호 처리에 필요한 Python 의존성이 포함되어 있습니다. FFmpeg나 AWS CLI는 별도 설치합니다. 현재 `psycopg`는 binary extra를 지정하지 않으므로 libpq가 없는 환경에서 `no pq wrapper available` 오류가 발생하면 다음을 실행합니다.
+### Backend
 
 ```bash
-python -m pip install "psycopg[binary]==3.3.5"
-```
-
-## 4. 환경변수 설정
-
-루트 `.env`는 `backend/database.py`에서 로드합니다. 예제의 자리표시자를 실제 로컬 설정으로 바꿉니다.
-
-| 변수 | 설정 |
-| --- | --- |
-| `DATABASE_URL` | Supabase PostgreSQL URL. 드라이버 `postgresql+psycopg`, SSL `sslmode=require` |
-| `JWT_SECRET` | 충분히 긴 무작위 문자열. 예제는 비워 두었으며 미설정 시 서버 시작 불가 |
-| `GEMINI_API_KEY` | 자막 교정에 사용. Gloss는 gemini provider 선택 시에만 사용 |
-| `KSL_GLOSS_PROVIDER` | 기본 `local`, 비교용 `gemini` |
-| `OLLAMA_BASE_URL`, `OLLAMA_GLOSS_MODEL` | 기본 `http://127.0.0.1:11434`, `qwen2.5:3b` |
-| `S3_CLIP_BUCKET` | `ksl-tube-avatar-clips` |
-| `AWS_PROFILE`, `AWS_DEFAULT_REGION` | 필요한 경우 사용할 AWS 프로필과 실제 버킷 리전 설정 |
-
-JWT secret은 `python -c "import secrets; print(secrets.token_urlsafe(48))"`로 로컬에서 생성하여 `.env`에만 저장할 수 있습니다. 출력값을 커밋하거나 공유 로그에 남기지 않습니다.
-
-`frontend/.env.local`에는 공개 가능한 API 주소만 설정합니다.
-
-```dotenv
-VITE_API_BASE_URL=http://127.0.0.1:8000
-```
-
-끝에 `/`를 붙이지 않습니다. `VITE_` 변수는 브라우저 번들에 노출되므로 DB 비밀번호·AWS/Gemini key·JWT secret을 넣으면 안 됩니다. 변경 후 Vite를 재시작합니다. 현재 Vite에는 API 프록시가 없으므로 로컬에서는 주소를 비워 두지 않습니다.
-
-Local LLM 설정은 루트 `.env.example`을 따릅니다. 변수 변경 후 Backend를 재시작합니다. Ollama가 Backend에서 접근 가능한 주소에서 실행 중이어야 합니다.
-
-## 5. Supabase 최초 연결 및 schema 적용
-
-Supabase 프로젝트의 연결 정보에서 실제 사용자명·호스트·포트를 확인합니다. 예제는 session pooler 형태의 자리표시자이며 프로젝트별 주소를 대입해야 합니다. 비밀번호의 `@`, `:`, `/`, `#` 등 특수문자는 비밀번호 부분을 URL 인코딩합니다. Supabase API URL이나 anon key를 `DATABASE_URL`에 넣지 않습니다.
-
-가상환경을 활성화한 **저장소 루트**에서 연결을 먼저 확인합니다. 성공하면 `1`을 출력하며 연결 URL은 출력하지 않습니다.
-
-```bash
-python -c "from backend.database import engine; from sqlalchemy import text; c = engine.connect(); print(c.execute(text('SELECT 1')).scalar_one()); c.close()"
-alembic current
-alembic heads
 alembic upgrade head
-alembic current
-```
-
-`alembic current`가 최종 head와 일치하는지 확인합니다. 공용 DB의 schema 변경은 팀 전체에 반영되므로 대상 프로젝트와 팀의 적용 상태를 확인하고 실행합니다. 이미 head이면 추가 migration이 적용되지 않습니다. 서버를 켜는 것만으로 테이블이 생성되지는 않습니다.
-
-| 주요 테이블 | 역할 |
-| --- | --- |
-| `users` | 계정, 온보딩 및 사용자 설정 |
-| `videos` | YouTube 원본 영상 정보 |
-| `translation_jobs` | 사용자별 작업, 상태, 결과 및 그룹 연결 |
-| `transcript_segments` | Job별 원문·교정 자막과 시간 구간 |
-| `groups` | 사용자별 History 그룹 |
-| `alembic_version` | 적용된 migration revision |
-
-schema 변경 시 모델 변경과 migration을 함께 커밋합니다. 루트에서 `alembic revision --autogenerate -m "describe schema change"`로 생성한 내용을 검토한 뒤 적용합니다. 테이블 충돌이나 revision 불일치는 적용 이력을 먼저 확인하고, 임의로 공용 테이블을 삭제하거나 `stamp head`로 건너뛰지 않습니다.
-
-## 6. AWS S3 및 클립 준비
-
-- 버킷: **`ksl-tube-avatar-clips`**
-- WORD object key: **`clips/word/WORDxxxx.mp4`** (예: `clips/word/WORD0001.mp4`). CSV 코드의 대소문자·숫자를 그대로 사용합니다.
-- boto3 기본 AWS 인증 체인을 사용합니다. 로컬은 팀에서 지정한 CLI 프로필/SSO 또는 로컬 자격 증명을 설정하고, 서버에서는 IAM Role을 사용할 수 있습니다.
-
-팀의 인증 방식에 따라 `aws configure --profile ksl-tube` 또는 SSO 프로필 설정·로그인을 마친 뒤 확인합니다. 아래는 `ksl-tube`라는 로컬 프로필을 만든 경우의 예시입니다.
-
-```bash
-aws sts get-caller-identity --profile ksl-tube
-aws s3api head-object --bucket ksl-tube-avatar-clips --key clips/word/WORD0001.mp4 --profile ksl-tube
-```
-
-두 번째 명령의 코드는 실제 존재하는 코드로 바꿉니다. 계정에는 해당 object를 읽는 `s3:GetObject` 권한이 필요합니다. CLI에서 확인한 프로필을 루트 `.env`의 `AWS_PROFILE`에도 설정합니다. AWS CLI 자체는 루트 `.env`를 자동으로 읽지 않습니다.
-
-`clip_resolver.py`가 중복 WORD 코드를 Job 안에서 한 번씩 **Job별 temporary directory**(`ksl_job_` 접두사)에 다운로드합니다. ffprobe와 FFmpeg는 로컬 파일을 사용하며 작업 종료 시 성공·예외 경로에서 임시 디렉터리를 정리합니다. 프로세스 강제 종료 시까지 정리를 보장하지는 않습니다.
-
-완성 영상은 `backend/static/results/{job_id}.mp4`에 남고 `/static/results/{job_id}.mp4`로 제공됩니다. 현재 결과 영상을 S3로 업로드하지 않습니다. S3 인증 오류나 없는 클립은 경고 후 누락 클립 처리로 넘어가므로 `COMPLETED`만으로 클립이 정상이라고 판단하지 말고 영상도 확인합니다.
-
-SEN 클립은 S3 경로 규칙이 아직 없어 `backend/static/videos/SENxxxx.mp4`를 확인합니다. 필요한 SEN 영상은 별도 전달받아야 합니다. 매핑용 `data/ALL_WORD_ID_MAPPING.csv`, `data/sen_sentence_mapping.csv`, `data/감정단어_매핑결과_대체어포함.csv`는 저장소에 포함되어 있습니다. 원본 데이터셋·모델 가중치·클립 영상은 Git에 추가하지 않습니다.
-
-## 7. Backend / Frontend 실행
-
-터미널 1: 루트에서 Python 가상환경을 활성화한 뒤 실행합니다. static 경로 때문에 **backend 디렉터리에서** 시작합니다.
-
-```bash
 cd backend
 uvicorn main:app --reload
 ```
 
-- Backend: `http://127.0.0.1:8000`
-- API 문서: `http://127.0.0.1:8000/docs`
-- 루트 응답: `{"message":"KSL-Tube backend is running"}`. DB·S3 연결까지 검증하는 health check는 아닙니다.
+- API: `http://127.0.0.1:8000`
+- Swagger: `http://127.0.0.1:8000/docs`
 
-터미널 2: 저장소 루트에서 실행합니다.
+### Frontend
 
 ```bash
 cd frontend
@@ -173,170 +146,50 @@ npm install
 npm run dev
 ```
 
-Frontend 기본 주소는 **`http://localhost:8443`**입니다. `vite.config.ts`의 기본 포트는 8443이며 `PORT` 환경변수가 있으면 그 값을 사용합니다. 포트가 사용 중이면 자동 전환하지 않고 종료합니다.
+기본 주소는 `http://localhost:8443`입니다.
 
-## 8. History CRUD 및 Job 상태
+## 환경변수
 
-History는 로그인한 사용자 소유 Job을 대상으로 합니다. 별도 History 생성 API 대신 Job 생성 시 사용자와 연결합니다. 토큰이 없거나 유효하지 않은 상태로 생성한 Job은 익명 작업이어서 개인 History에 표시되지 않습니다.
+전체 항목은 [`.env.example`](.env.example), Frontend 설정은 [`frontend/.env.example`](frontend/.env.example)을 참고합니다. 실제 키와 비밀번호는 커밋하지 않습니다.
 
-| 동작 | 현재 API / 동작 |
+| 변수 | 용도 |
 | --- | --- |
-| 생성 (Create) | `POST /translate/jobs` — 로그인 토큰이 있으면 사용자 History에 연결 |
-| 조회 (Read) | `GET /history` — 자신의 목록; `GET /translate/jobs/{job_id}` — Job 상태·결과 |
-| 수정 (Update) | `PATCH /history/{job_id}/group` — `group_id` 지정 또는 `null`로 해제 |
-| 삭제 (Delete) | `DELETE /history/{job_id}` — 자신의 Job 및 종속 자막 삭제 |
-| 그룹 관리 | `GET /history/groups`, `POST /history/groups`, `DELETE /history/groups/{group_id}` |
+| `DATABASE_URL` | Supabase PostgreSQL 연결 |
+| `JWT_SECRET` | 인증 토큰 서명 |
+| `GEMINI_API_KEY_*` | 자막 교정·영상 전사·Gloss 변환 |
+| `YOUTUBE_API_KEY` | 영상 메타데이터 조회 |
+| `KSL_GLOSS_PROVIDER` | `gemini`, `local`, `mt5` 선택 |
+| `S3_CLIP_BUCKET` | 수어 Asset 저장소 |
+| `S3_RESULT_BUCKET` | 결과 MP4 저장소 |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | 배포 환경 S3 인증 |
+| `VITE_API_BASE_URL` | Frontend에서 호출할 Backend 주소 |
 
-그룹 삭제는 기록의 그룹 연결만 해제하고 기록은 유지합니다. 기록 삭제는 원본 `videos` 행과 결과 MP4 파일까지 삭제하지 않습니다. 현재 그룹 이름 수정 API와 기록 제목 수정 API는 없습니다.
+`local` provider는 Ollama/Qwen 실행 환경이 필요하고, `mt5` provider는 별도로 학습한 모델 가중치가 필요합니다.
 
-주요 Job status:
+## 테스트
 
-```text
-QUEUED → TRANSCRIPTING → KSL_CONVERTING → SIGN_MAPPING → TIMELINE_BUILDING → COMPLETED
-실패 시 FAILED (failed_stage, error_code, error_message 확인)
-```
-
-Job은 FastAPI `BackgroundTasks`로 처리하며 별도 영속 작업 큐는 없습니다. 처리 중 서버 reload/종료 시 자동 복구가 보장되지 않습니다.
-
-## 9. 검증 및 문제 해결
-
-최초 실행 후 회원가입 → 로그인 → 온보딩 → 한국어 자막이 있는 YouTube URL 변환 → 상태 변화 → 결과 영상·자막 재생 → History 조회 → 그룹 생성·이동·해제 → 기록·그룹 삭제를 확인합니다. 새로고침 후에도 DB 기록이 유지되는지 확인합니다.
-
-자동 테스트는 **저장소 루트**에서 실행합니다. 아래 명령은 테스트 프로세스에 SQLite와 테스트 전용 JWT 값을 설정해 공용 DB 사용을 피합니다. 외부 호출은 기존 테스트에서 모킹합니다.
+Backend:
 
 ```bash
-python -c "import os, unittest; os.environ['DATABASE_URL']='sqlite://'; os.environ['JWT_SECRET']='unit-test-only-not-a-real-secret'; suite=unittest.defaultTestLoader.discover('tests'); result=unittest.TextTestRunner(verbosity=2).run(suite); raise SystemExit(not result.wasSuccessful())"
+DATABASE_URL=sqlite:// JWT_SECRET=unit-test-only-not-a-real-secret \
+python -m unittest discover -s tests -v
 ```
 
-기존 테스트는 S3 클립 다운로드·격리·정리, History 삭제 및 FK migration, Gemini 자막 교정과 관련 endpoint를 확인합니다. `httpx`는 `google-genai`의 의존성으로 설치됩니다. 테스트 통과가 실제 Supabase·YouTube·Gemini·S3·FFmpeg 전체 E2E 성공을 의미하지는 않습니다.
-
-프런트엔드 빌드 및 변경 검사:
+Frontend:
 
 ```bash
 cd frontend
 npm run build
-cd ..
-git diff --check
-git status --short
+node --test tests/synchronizedPlayback.test.mjs
 ```
 
-| 증상 | 확인할 내용 |
-| --- | --- |
-| `DATABASE_URL` / `JWT_SECRET` 미설정 | 루트 `.env` 위치·빈 값 여부, 기존 셸 환경변수의 우선 적용 여부 |
-| Supabase 접속 실패 | host/port/user, 비밀번호 URL 인코딩, SSL, 네트워크 |
-| 테이블·컬럼 없음 | 루트에서 `alembic current`와 `alembic heads` 비교 및 migration 적용 |
-| API 요청 실패 | Backend 실행, `VITE_API_BASE_URL`, 프런트엔드 재시작 |
-| `ffmpeg` / `ffprobe` 없음 | PATH 설정 후 터미널 재시작, 각각 `-version` 실행 |
-| 아바타 누락 | S3 object key·권한·AWS 프로필, clip 경고, SEN 로컬 파일 |
-| `FAILED` | Job 실패 단계·코드 확인. 자막 없는 영상, Gemini 인증·호출 제한, FFmpeg 오류 구분 |
+## 배포 참고 사항
 
-## 10. 남은 작업 및 협업
-
-환경변수를 팀원과 공유해야 하는 경우 실제 값은 제외하고 `.env.example` 파일을 사용합니다.
+- Render에서는 로컬 AWS CLI 프로필 대신 환경변수 기반 인증을 사용합니다.
+- 완성 영상은 Render의 임시 디스크가 아닌 S3 `results/{job_id}.mp4`에 저장합니다.
+- Render 무료 인스턴스는 CPU·메모리가 제한되어 영상 길이에 따라 FFmpeg 합성 시간이 늘어날 수 있습니다.
+- Job은 FastAPI BackgroundTasks로 실행하며, 서버가 재시작되면 진행 중이던 작업을 실패 상태로 정리합니다.
 
 ---
 
-## 🤖 Local LLM Gloss 변환
-
-외부 LLM API quota에 의존하지 않고 개발 및 E2E 테스트를 진행할 수 있도록
-한국어 문장을 KSL Gloss 문자열 배열로 변환하는 로컬 LLM 경로를 제공합니다.
-
-기존 Backend 계약인 `convert_to_gloss(korean_text: str) -> list[str]`은 유지하며,
-팀의 `KSLConverter` 계약으로 연결하고, CSV 매핑 뒤 Job별 S3 다운로드 경로를 Timeline / Renderer에 전달합니다.
-
-### 처리 흐름
-
-```text
-한국어 자막
-  → Local LLM (Ollama + Qwen)
-  → KSL Gloss 문자열 배열
-  → Gloss Matcher
-  → WORD / SEN asset code
-  → Timeline / Avatar
-```
-
-### 1. Ollama 및 모델 준비
-
-Ollama가 설치되어 있는지 확인합니다.
-
-```bash
-ollama --version
-```
-
-기본 모델을 내려받습니다.
-
-```bash
-ollama pull qwen2.5:3b
-ollama list
-```
-
-### 2. 환경변수
-
-`.env.example`을 참고해 설정합니다.
-
-```env
-KSL_GLOSS_PROVIDER=local
-OLLAMA_BASE_URL=http://127.0.0.1:11434
-OLLAMA_GLOSS_MODEL=qwen2.5:3b
-```
-
-별도 설정이 없으면 Gloss 변환 provider는 `local`, 모델은 `qwen2.5:3b`을 기본값으로 사용합니다.
-
-기존 Gemini Gloss 경로로 비교 또는 롤백하려면:
-
-```env
-KSL_GLOSS_PROVIDER=gemini
-GEMINI_API_KEY=your_api_key
-GEMINI_GLOSS_MODEL=gemini-flash-lite-latest
-```
-
-> 기존 자막 보정 서비스(`llm_subtitle_correction_service.py`)는 별도로 Gemini를 사용하므로,
-> 전체 E2E 실행 시에는 Gloss provider를 local로 설정해도 Gemini API key/quota가 필요할 수 있습니다.
-
-### 3. Local Gloss 단독 실행 테스트
-
-프로젝트의 `backend` 디렉터리에서 실행합니다.
-
-```bash
-cd backend
-python -c "from services.llm_gloss_service import convert_to_gloss; print(convert_to_gloss('나는 학교에 가요.'))"
-```
-
-예시 출력:
-
-```text
-['나', '학교', '가다']
-```
-
-### 4. 테스트
-
-프로젝트 루트에서:
-
-```bash
-PYTHONPATH=backend python -m unittest tests/test_local_llm_gloss_service.py -v
-```
-
-### 구현 위치
-
-- `backend/services/llm_gloss_service.py`: Local/Gemini provider facade 및 기존 호출 계약 유지
-- `backend/services/local_llm_gloss_service.py`: Ollama 호출, structured JSON 출력 및 Gloss 파싱
-- `backend/services/gloss_matcher.py`: 생성된 Gloss를 기존 WORD/SEN asset으로 매핑
-- `tests/test_local_llm_gloss_service.py`: Local LLM 응답 파싱/요청 계약 테스트
-
-### 현재 검증 범위 및 한계
-
-로컬 환경에서 Ollama + `qwen2.5:3b` 호출과 한국어 → Gloss 변환이 동작하는 것을 확인했습니다.
-예를 들어 `나는 학교에 가요.`는 `['나', '학교', '가다']`,
-`나는 커피를 마시지 않아요.`는 `['나', '커피', '마시다', '않다']` 형태로 변환됩니다.
-
-다만 LLM이 생성한 자연스러운 Gloss가 현재 WORD/SEN asset vocabulary와 항상 일치하는 것은 아닙니다.
-따라서 Local LLM 연결 및 Gloss 생성 경로는 구현되어 있으나,
-조사 정규화·SEN 문장 매핑·의미 검증은 반영되어 있습니다. 퍼지 매칭은 의미가 다른 단어로 연결되는 사례 때문에 사용하지 않습니다. CSV 매칭과 실제 수어 의미의 정확성은 구분해서 평가합니다.
-
-이번 통합 범위와 검증 결과는 [Local LLM·S3 통합 기록](docs/local_llm_s3_integration.md)을 참고합니다.
-
-- **Local LLM·S3 통합 검증**: `KSLConverter.convert(text) -> list[str]` 계약으로 연결했습니다. 실제 모델·공용 DB·S3를 함께 사용하는 검증은 아래 E2E 범위로 확인합니다.
-- **전체 E2E 재검증**: 실제 공용 DB와 외부 API/S3/FFmpeg를 사용하는 변환, 인증, History CRUD 및 실패 경로를 재검증합니다.
-- **배포환경 성능 측정**: 자막 교정·Gloss·S3·FFmpeg 단계별 시간, 동시 Job의 CPU/메모리·임시 디스크 사용량을 측정합니다. 결과 파일 보관, 작업 큐/재시작 복구, CORS origin 제한도 배포 구성에서 검토합니다.
-
-이 브랜치가 원격에 게시된 이후에는 `git pull --ff-only origin jihyun/local-llm-s3-integration`로 동기화합니다. `.env`, `frontend/.env.local` 및 실제 secret이 들어간 파일은 절대 커밋하지 않습니다. 공유 설정은 예제 파일만 수정하고 코드/schema 변경은 관련 migration과 함께 PR로 검토합니다.
+공농은 자막만으로 전달하기 어려운 영상의 의미와 맥락을 수어로 보완해, 청각장애인의 영상 콘텐츠 접근성을 높이는 것을 목표로 합니다.
