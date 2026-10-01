@@ -1,0 +1,20 @@
+﻿{
+  "clips": 18,
+  "total_frames": 1454,
+  "source_video_hashes_unchanged": true,
+  "sources": {
+    "knn": "1a695fa01001631bb20b39b08d8ab72e63e5b176",
+    "jihyeon": "0148313d112b64a679f12e0082b872633370c582"
+  },
+  "mean_per_clip_direction_error_deg": {
+    "baseline": 27.975386176386667,
+    "knn": 29.126374850992324,
+    "knn_jihyeon": 20.69145041332014
+  },
+  "max_final_frame_rotation_deg": 16.000063055307955,
+  "source_consistency_improved_vs_knn": 18,
+  "source_consistency_improved_vs_baseline": 18,
+  "prior_sha256": "89d9fe42e364b677395e10ccb6e42f1ddf954f7db1a7039353437eef9e4795ee",
+  "avatar_sha256": "765c12e47fd697c4fc51d66f03cc8ba852149696f86da83e9995dfe695d94ca9",
+  "profile_sha256": "a1f6eabda5d8a9f8907fd74d7c60cd69fab3c197172cdd2a50cd786981198c0f"
+}

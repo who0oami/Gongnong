@@ -1,0 +1,128 @@
+﻿[
+  {
+    "word": "WORD3002",
+    "status": "PASS",
+    "integer_and_half_frames": 239,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975640177726746
+  },
+  {
+    "word": "WORD3003",
+    "status": "PASS",
+    "integer_and_half_frames": 195,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975640177726746
+  },
+  {
+    "word": "WORD3004",
+    "status": "PASS",
+    "integer_and_half_frames": 195,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975640773773193
+  },
+  {
+    "word": "WORD3005",
+    "status": "PASS",
+    "integer_and_half_frames": 193,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975640177726746
+  },
+  {
+    "word": "WORD3006",
+    "status": "PASS",
+    "integer_and_half_frames": 135,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9977905750274658
+  },
+  {
+    "word": "WORD3007",
+    "status": "PASS",
+    "integer_and_half_frames": 135,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975640177726746
+  },
+  {
+    "word": "WORD3008",
+    "status": "PASS",
+    "integer_and_half_frames": 137,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975640773773193
+  },
+  {
+    "word": "WORD3009",
+    "status": "PASS",
+    "integer_and_half_frames": 137,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9976294040679932
+  },
+  {
+    "word": "WORD3010",
+    "status": "PASS",
+    "integer_and_half_frames": 133,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975852966308594
+  },
+  {
+    "word": "WORD3011",
+    "status": "PASS",
+    "integer_and_half_frames": 133,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975639581680298
+  },
+  {
+    "word": "WORD3012",
+    "status": "PASS",
+    "integer_and_half_frames": 133,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975640773773193
+  },
+  {
+    "word": "WORD3013",
+    "status": "PASS",
+    "integer_and_half_frames": 133,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975639581680298
+  },
+  {
+    "word": "WORD3014",
+    "status": "PASS",
+    "integer_and_half_frames": 135,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975640773773193
+  },
+  {
+    "word": "WORD3015",
+    "status": "PASS",
+    "integer_and_half_frames": 193,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975640177726746
+  },
+  {
+    "word": "WORD3016",
+    "status": "PASS",
+    "integer_and_half_frames": 197,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975640177726746
+  },
+  {
+    "word": "WORD3017",
+    "status": "PASS",
+    "integer_and_half_frames": 195,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9978650808334351
+  },
+  {
+    "word": "WORD3018",
+    "status": "PASS",
+    "integer_and_half_frames": 137,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9976376295089722
+  },
+  {
+    "word": "WORD3019",
+    "status": "PASS",
+    "integer_and_half_frames": 135,
+    "protected_transform_and_face_max_error": 0.0,
+    "min_finger_quaternion_norm": 0.9975992441177368
+  }
+]

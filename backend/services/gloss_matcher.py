@@ -5,7 +5,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = BASE_DIR / "data"
 
-WORD_CSV_PATH = DATA_DIR / "ALL_WORD_ID_MAPPING.csv"
+WORD_CSV_PATH = DATA_DIR / "word3000_mapping.csv"
 SEN_CSV_PATH = DATA_DIR / "sen_sentence_mapping.csv"
 EMOTION_CSV_PATH = DATA_DIR / "감정단어_매핑결과_대체어포함.csv"
 
@@ -24,7 +24,7 @@ def _extract_code(raw_code: str) -> str | None:
 
 
 def _load_word_map() -> dict[str, str]:
-    """ALL_WORD_ID_MAPPING.csv: word -> word_id (동일 단어가 여러 행에 있으면 먼저 나온 것을 사용)"""
+    """word3000_mapping.csv: word -> word_id (동일 단어가 여러 행에 있으면 먼저 나온 것을 사용)"""
     word_map: dict[str, str] = {}
 
     with open(WORD_CSV_PATH, encoding="utf-8-sig", newline="") as f:
@@ -44,8 +44,7 @@ def _load_word_map() -> dict[str, str]:
 
 
 def _load_sen_token_map() -> dict[str, str]:
-    """sen_sentence_mapping.csv: sentence를 공백으로 나눈 토큰 -> sen_id
-    (동일 토큰이 여러 문장에 있으면 먼저 나온 것을 사용)"""
+    """SEN 문장 전체 표현 -> 코드. 문장 일부를 개별 단어 자산으로 쓰지 않는다."""
     token_map: dict[str, str] = {}
 
     with open(SEN_CSV_PATH, encoding="utf-8-sig", newline="") as f:
@@ -58,11 +57,9 @@ def _load_sen_token_map() -> dict[str, str]:
             if not sen_id or not sentence:
                 continue
 
-            for token in sentence.split():
-                token = token.strip()
-
-                if token and token not in token_map:
-                    token_map[token] = sen_id
+            label = " ".join(sentence.split())
+            if label and label not in token_map:
+                token_map[label] = sen_id
 
     return token_map
 
@@ -110,6 +107,58 @@ _WORD_MAP = _load_word_map()
 _SEN_TOKEN_MAP = _load_sen_token_map()
 _EMOTION_FOUND_MAP, _EMOTION_ALT_MAP = _load_emotion_maps()
 
+# LLM이 사전형 정규화를 지시받아도 문장 끝 gloss에 조사를 남기는 경우가 있어
+# (예: "학교에" -> vocabulary는 "학교"), 흔한 조사만 제거해 재시도한다. 어미/활용
+# 분석기는 쓰지 않으므로 실제 조사가 아닌 마지막 글자가 우연히 겹치는 경우도
+# 있을 수 있다 (예: "이가" -> "이"). 길이가 더 긴 조사부터 시도해 오탐을 줄인다.
+_JOSA_SUFFIXES = sorted(
+    [
+        "이라고", "이라는", "라고", "라는", "에서", "에게", "으로", "처럼", "만큼",
+        "부터", "까지", "이랑", "랑", "께", "은", "는", "이", "가", "을", "를",
+        "의", "에", "와", "과", "도", "만", "로",
+    ],
+    key=len,
+    reverse=True,
+)
+
+def _valid_synonym_asset(label: str, code: str) -> bool:
+    # CSV의 명시적 대체어는 유지하되, SEN 문장 일부만 가리키는 연결은 제외한다.
+    if code.startswith("SEN"):
+        return _SEN_TOKEN_MAP.get(" ".join(label.split())) == code
+    return True
+
+
+def _lookup_exact(token: str) -> dict | None:
+    # 1. word3000_mapping.csv 직접 일치
+    word_id = _WORD_MAP.get(token)
+    if word_id:
+        return {"matched_word": token, "source": "WORD", "code": word_id}
+
+    # 2. SEN 전체 표현 일치 (단일 토큰 문장도 포함)
+    sen_id = _SEN_TOKEN_MAP.get(token)
+    if sen_id:
+        return {"matched_word": token, "source": "SEN", "code": sen_id}
+
+    # 3. 감정단어 매핑 - 발견단어
+    found = _EMOTION_FOUND_MAP.get(token)
+    if found and _valid_synonym_asset(*found):
+        found_word, code = found
+        return {"matched_word": found_word, "source": "SYNONYM_FOUND", "code": code}
+
+    # 4. 감정단어 매핑 - 대체어
+    alt = _EMOTION_ALT_MAP.get(token)
+    if alt and _valid_synonym_asset(*alt):
+        alt_word, code = alt
+        return {"matched_word": alt_word, "source": "SYNONYM_ALTERNATIVE", "code": code}
+
+    return None
+
+
+def _strip_josa_candidates(token: str):
+    for suffix in _JOSA_SUFFIXES:
+        if token.endswith(suffix) and len(token) > len(suffix):
+            yield token[: -len(suffix)]
+
 
 def _match_single_gloss(gloss: str) -> dict:
     result = {
@@ -118,39 +167,40 @@ def _match_single_gloss(gloss: str) -> dict:
         "matched_word": None,
         "source": None,
         "code": None,
+        "match_type": None,
     }
 
-    # 1. ALL_WORD_ID_MAPPING.csv 직접 일치
-    word_id = _WORD_MAP.get(gloss)
-    if word_id:
-        result.update(matched=True, matched_word=gloss, source="WORD", code=word_id)
+    # 1. 완전 일치
+    exact = _lookup_exact(gloss)
+    if exact:
+        result.update(matched=True, match_type="exact", **exact)
         return result
 
-    # 2. sen_sentence_mapping.csv 토큰 일치
-    sen_id = _SEN_TOKEN_MAP.get(gloss)
-    if sen_id:
-        result.update(matched=True, matched_word=gloss, source="SEN", code=sen_id)
-        return result
+    # 2. 조사 제거 후 재일치
+    for candidate in _strip_josa_candidates(gloss):
+        normalized = _lookup_exact(candidate)
+        if normalized:
+            result.update(matched=True, match_type="normalized", **normalized)
+            return result
 
-    # 3. 감정단어 매핑 - 발견단어
-    found = _EMOTION_FOUND_MAP.get(gloss)
-    if found:
-        found_word, code = found
-        result.update(matched=True, matched_word=found_word, source="SYNONYM_FOUND", code=code)
-        return result
-
-    # 4. 감정단어 매핑 - 대체어
-    alt = _EMOTION_ALT_MAP.get(gloss)
-    if alt:
-        alt_word, code = alt
-        result.update(matched=True, matched_word=alt_word, source="SYNONYM_ALTERNATIVE", code=code)
-        return result
-
-    # 5. 매칭 실패
+    # 3. 매칭 실패
+    #
+    # 자모 단위 difflib 유사도로 문자열이 가까운 vocabulary 항목을 후보로
+    # 대신 쓰는 방식도 시도했지만 채택하지 않았다: 한국어 동사는 "-다"/"-하다"
+    # 어미를 공유하는 경우가 매우 흔해서, 어간이 전혀 다른 단어끼리도 (예:
+    # "않다"->"알다", "사랑하다"->"상상하다") 오탐과 같은 수준의 유사도가
+    # 나온다. 틀린 수어를 맞는 것처럼 보여주는 것은 캡션으로 대체하는 것보다
+    # 나쁘므로, 형태소 분석기 없이는 이 이상의 후보 검색을 넣지 않는다.
     return result
 
 
 def match_gloss_sequence(gloss_list: list[str]) -> list[dict]:
+    # 하나의 입력 segment 전체가 SEN 표현과 일치할 때 클립을 한 번만 재생한다.
+    # 부분 구간 탐색, 어순 변경, 조사 제거를 통한 문장 결합은 하지 않는다.
+    phrase = " ".join(gloss_list)
+    if len(gloss_list) > 1 and phrase in _SEN_TOKEN_MAP:
+        return [{"gloss": phrase, "matched": True, "matched_word": phrase,
+                 "source": "SEN", "code": _SEN_TOKEN_MAP[phrase], "match_type": "exact"}]
     return [_match_single_gloss(gloss) for gloss in gloss_list]
 
 

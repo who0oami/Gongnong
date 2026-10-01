@@ -1,0 +1,365 @@
+﻿{
+  "meshes": {
+    "Body": {
+      "mesh_name": "Body (merged)",
+      "shape_keys": []
+    },
+    "Face": {
+      "mesh_name": "Face (merged)(Clone)",
+      "shape_keys": [
+        {
+          "name": "Basis",
+          "value": 1.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_ALL_Neutral",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_ALL_Angry",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_ALL_Fun",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_ALL_Joy",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_ALL_Sorrow",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_ALL_Surprised",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_BRW_Angry",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_BRW_Fun",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_BRW_Joy",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_BRW_Sorrow",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_BRW_Surprised",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Natural",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Angry",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Close",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Close_R",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Close_L",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Fun",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Joy",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Joy_R",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Joy_L",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Sorrow",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Surprised",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Spread",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Iris_Hide",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_EYE_Highlight_Hide",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_Close",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_Up",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_Down",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_Angry",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_Small",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_Large",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_Neutral",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_Fun",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_Joy",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_Sorrow",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_Surprised",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_SkinFung",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_SkinFung_R",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_SkinFung_L",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_A",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_I",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_U",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_E",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_MTH_O",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Hide",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Fung1",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Fung1_Low",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Fung1_Up",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Fung2",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Fung2_Low",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Fung2_Up",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Fung3",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Fung3_Up",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Fung3_Low",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Short",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Short_Up",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        },
+        {
+          "name": "Fcl_HA_Short_Low",
+          "value": 0.0,
+          "slider_min": 0.0,
+          "slider_max": 1.0
+        }
+      ]
+    },
+    "Hair": {
+      "mesh_name": "Hair001 (merged)",
+      "shape_keys": []
+    }
+  }
+}

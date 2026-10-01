@@ -1,5 +1,6 @@
-"""Structured Gemini Gloss conversion with bounded transient-error retries."""
+"""KSL Gloss conversion with Gemini, Ollama, or a local mT5 model."""
 import json
+import os
 
 from dotenv import load_dotenv
 from google.genai import types
@@ -18,10 +19,41 @@ def get_gloss_batch_size() -> int:
     return _env_int("GEMINI_GLOSS_BATCH_SIZE", 5, 1)
 
 
+def _provider() -> str:
+    return os.getenv("KSL_GLOSS_PROVIDER", "gemini").strip().lower()
+
+
+def _convert_local(text: str) -> list[str]:
+    try:
+        from .local_llm_gloss_service import convert_to_gloss_local
+
+        return convert_to_gloss_local(text)
+    except Exception as exc:
+        raise GlossConversionError(f"Local LLM Gloss 변환 실패 ({type(exc).__name__})") from exc
+
+
+def _convert_mt5(text: str) -> list[str]:
+    try:
+        from ai.mt5_gloss_service import convert_to_gloss as convert_to_gloss_mt5
+
+        return convert_to_gloss_mt5(text)
+    except Exception as exc:
+        raise GlossConversionError(f"mT5 Gloss 변환 실패 ({type(exc).__name__})") from exc
+
+
 def convert_batch(texts: list[str]) -> list[list[str]]:
     """One request per batch; validate and restore input order by index."""
     if not texts:
         return []
+    provider = _provider()
+    if provider == "local":
+        return [_convert_local(text) for text in texts]
+    if provider == "mt5":
+        return [_convert_mt5(text) for text in texts]
+    if provider != "gemini":
+        raise GlossConversionError(
+            f"지원하지 않는 KSL_GLOSS_PROVIDER={provider!r}; gemini, local, mt5 중 하나를 사용하세요"
+        )
     schema = {
         "type": "object", "required": ["segments"],
         "properties": {"segments": {

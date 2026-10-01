@@ -151,6 +151,7 @@ activemq-data/
 .env
 .envrc
 .venv
+.venv-ai/
 env/
 venv/
 ENV/
@@ -231,6 +232,8 @@ __marimo__/
 data/raw/
 data/videos/
 data/datasets/
+ai/data/
+ai/models/
 
 # Video files
 *.mp4

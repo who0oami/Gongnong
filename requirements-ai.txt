@@ -1,0 +1,8 @@
+torch>=2.2
+transformers==4.46.3
+tokenizers==0.20.3
+datasets==3.6.0
+accelerate>=1,<2
+sentencepiece
+protobuf>=4.25
+dill==0.3.8

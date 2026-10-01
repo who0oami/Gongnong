@@ -1,0 +1,17 @@
+﻿<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MediaPipe 수어 · 팔과 손목 검증</title>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+<style>
+body{margin:0;background:#111824;color:#e4edf7;font:16px system-ui}header,footer{padding:18px 24px}h1{font-size:24px;margin:0 0 12px}p{color:#aabbd0}main{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 24px}.stage{position:relative}video,#render{width:100%;height:62vh;object-fit:contain;background:#080c12}#overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}label,button{display:inline-block;margin:6px}button,input{font:inherit}#seek{width:65%}#status{color:#81dacb}small{display:block;margin:10px 0;color:#aabbd0}@media(max-width:800px){main{grid-template-columns:1fr}video,#render{height:42vh}}
+</style></head><body>
+<header><h1>사랑 · MediaPipe 팔과 손목 검증</h1><div id="status">모델과 키포인트를 불러오는 중…</div>
+<label>영상 <input id="videoFile" type="file" accept="video/*"></label>
+<label>키포인트 JSON <input id="jsonFile" type="file" accept=".json"></label>
+<small>양손 키포인트는 표시하며, 아바타에는 상완·하완·손목 방향만 적용합니다. 손가락과 표정은 다음 단계입니다.</small></header>
+<main><section class="stage"><video id="video" src="assets/love.mp4" controls muted playsinline></video><canvas id="overlay"></canvas></section><section><canvas id="render"></canvas></section></main>
+<footer><button id="play">재생 / 정지 (Space)</button><input id="seek" type="range" min="0" max="0" value="0"><span id="frame">0</span>
+<p>하늘색: 몸 · 노란색: 왼손 · 분홍색: 오른손. 단일 영상에서 추정한 깊이이므로 원본과 비교해 확인하세요.</p></footer>
+<script src="app.js"></script></body></html>
+
