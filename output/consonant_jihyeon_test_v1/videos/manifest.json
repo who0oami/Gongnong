@@ -1,0 +1,182 @@
+﻿[
+    {
+        "word":  "WORD3002",
+        "source_video":  null,
+        "baseline":  "WORD3002_baseline.mp4",
+        "knn":  "WORD3002_knn.mp4",
+        "jihyeon":  "WORD3002_jihyeon.mp4",
+        "baseline_hand":  "WORD3002_baseline_hand.mp4",
+        "knn_hand":  "WORD3002_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3002_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3003",
+        "source_video":  null,
+        "baseline":  "WORD3003_baseline.mp4",
+        "knn":  "WORD3003_knn.mp4",
+        "jihyeon":  "WORD3003_jihyeon.mp4",
+        "baseline_hand":  "WORD3003_baseline_hand.mp4",
+        "knn_hand":  "WORD3003_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3003_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3004",
+        "source_video":  null,
+        "baseline":  "WORD3004_baseline.mp4",
+        "knn":  "WORD3004_knn.mp4",
+        "jihyeon":  "WORD3004_jihyeon.mp4",
+        "baseline_hand":  "WORD3004_baseline_hand.mp4",
+        "knn_hand":  "WORD3004_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3004_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3005",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3005.mp4",
+        "baseline":  "WORD3005_baseline.mp4",
+        "knn":  "WORD3005_knn.mp4",
+        "jihyeon":  "WORD3005_jihyeon.mp4",
+        "baseline_hand":  "WORD3005_baseline_hand.mp4",
+        "knn_hand":  "WORD3005_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3005_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3006",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3006.mp4",
+        "baseline":  "WORD3006_baseline.mp4",
+        "knn":  "WORD3006_knn.mp4",
+        "jihyeon":  "WORD3006_jihyeon.mp4",
+        "baseline_hand":  "WORD3006_baseline_hand.mp4",
+        "knn_hand":  "WORD3006_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3006_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3007",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3007.mp4",
+        "baseline":  "WORD3007_baseline.mp4",
+        "knn":  "WORD3007_knn.mp4",
+        "jihyeon":  "WORD3007_jihyeon.mp4",
+        "baseline_hand":  "WORD3007_baseline_hand.mp4",
+        "knn_hand":  "WORD3007_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3007_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3008",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3008.mp4",
+        "baseline":  "WORD3008_baseline.mp4",
+        "knn":  "WORD3008_knn.mp4",
+        "jihyeon":  "WORD3008_jihyeon.mp4",
+        "baseline_hand":  "WORD3008_baseline_hand.mp4",
+        "knn_hand":  "WORD3008_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3008_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3009",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3009.mp4",
+        "baseline":  "WORD3009_baseline.mp4",
+        "knn":  "WORD3009_knn.mp4",
+        "jihyeon":  "WORD3009_jihyeon.mp4",
+        "baseline_hand":  "WORD3009_baseline_hand.mp4",
+        "knn_hand":  "WORD3009_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3009_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3010",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3010.mp4",
+        "baseline":  "WORD3010_baseline.mp4",
+        "knn":  "WORD3010_knn.mp4",
+        "jihyeon":  "WORD3010_jihyeon.mp4",
+        "baseline_hand":  "WORD3010_baseline_hand.mp4",
+        "knn_hand":  "WORD3010_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3010_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3011",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3011.mp4",
+        "baseline":  "WORD3011_baseline.mp4",
+        "knn":  "WORD3011_knn.mp4",
+        "jihyeon":  "WORD3011_jihyeon.mp4",
+        "baseline_hand":  "WORD3011_baseline_hand.mp4",
+        "knn_hand":  "WORD3011_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3011_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3012",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3012.mp4",
+        "baseline":  "WORD3012_baseline.mp4",
+        "knn":  "WORD3012_knn.mp4",
+        "jihyeon":  "WORD3012_jihyeon.mp4",
+        "baseline_hand":  "WORD3012_baseline_hand.mp4",
+        "knn_hand":  "WORD3012_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3012_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3013",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3013.mp4",
+        "baseline":  "WORD3013_baseline.mp4",
+        "knn":  "WORD3013_knn.mp4",
+        "jihyeon":  "WORD3013_jihyeon.mp4",
+        "baseline_hand":  "WORD3013_baseline_hand.mp4",
+        "knn_hand":  "WORD3013_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3013_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3014",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3014.mp4",
+        "baseline":  "WORD3014_baseline.mp4",
+        "knn":  "WORD3014_knn.mp4",
+        "jihyeon":  "WORD3014_jihyeon.mp4",
+        "baseline_hand":  "WORD3014_baseline_hand.mp4",
+        "knn_hand":  "WORD3014_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3014_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3015",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3015.mp4",
+        "baseline":  "WORD3015_baseline.mp4",
+        "knn":  "WORD3015_knn.mp4",
+        "jihyeon":  "WORD3015_jihyeon.mp4",
+        "baseline_hand":  "WORD3015_baseline_hand.mp4",
+        "knn_hand":  "WORD3015_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3015_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3016",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3016.mp4",
+        "baseline":  "WORD3016_baseline.mp4",
+        "knn":  "WORD3016_knn.mp4",
+        "jihyeon":  "WORD3016_jihyeon.mp4",
+        "baseline_hand":  "WORD3016_baseline_hand.mp4",
+        "knn_hand":  "WORD3016_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3016_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3017",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3017.mp4",
+        "baseline":  "WORD3017_baseline.mp4",
+        "knn":  "WORD3017_knn.mp4",
+        "jihyeon":  "WORD3017_jihyeon.mp4",
+        "baseline_hand":  "WORD3017_baseline_hand.mp4",
+        "knn_hand":  "WORD3017_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3017_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3018",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3018.mp4",
+        "baseline":  "WORD3018_baseline.mp4",
+        "knn":  "WORD3018_knn.mp4",
+        "jihyeon":  "WORD3018_jihyeon.mp4",
+        "baseline_hand":  "WORD3018_baseline_hand.mp4",
+        "knn_hand":  "WORD3018_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3018_jihyeon_hand.mp4"
+    },
+    {
+        "word":  "WORD3019",
+        "source_video":  "C:\\Users\\ESTsoft\\Downloads\\ksl-babylon-test\\ksl-tube-latest\\word2153\\output\\consonant_recordings\\WORD3019.mp4",
+        "baseline":  "WORD3019_baseline.mp4",
+        "knn":  "WORD3019_knn.mp4",
+        "jihyeon":  "WORD3019_jihyeon.mp4",
+        "baseline_hand":  "WORD3019_baseline_hand.mp4",
+        "knn_hand":  "WORD3019_knn_hand.mp4",
+        "jihyeon_hand":  "WORD3019_jihyeon_hand.mp4"
+    }
+]

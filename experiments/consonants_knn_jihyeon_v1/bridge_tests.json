@@ -1,0 +1,9 @@
+﻿{
+  "status": "PASS",
+  "checks": [
+    "identity rest pose",
+    "rigid source orientation invariance",
+    "unverified identity skipped",
+    "degenerate palm skipped"
+  ]
+}

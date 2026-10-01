@@ -1,0 +1,19 @@
+{
+  "profile_name": "Model_Male_VRM",
+  "smoothing_radius": 1,
+  "palm_normal_sign": {
+    "L": 1.0,
+    "R": -1.0
+  },
+  "finger": {
+    "max_bend_degrees": 82.0,
+    "min_bend_degrees": 0.0,
+    "gain": 1.0,
+    "thumb_gain": 0.85,
+    "bend_sign": {
+      "L": -1.0,
+      "R": -1.0
+    },
+    "reject_segment_ratio_below": 0.08
+  }
+}

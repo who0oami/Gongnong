@@ -1,0 +1,8 @@
+runs/
+imageio_ffmpeg/
+__pycache__/
+vendor/**/models/
+vendor/**/.mplconfig/
+vendor/**/diagnostics/
+vendor/**/__pycache__/
+*.log

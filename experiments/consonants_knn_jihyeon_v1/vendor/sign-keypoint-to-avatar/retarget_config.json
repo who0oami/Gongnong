@@ -1,0 +1,7 @@
+﻿{
+  "model_file": "C:/Users/ESTsoft/Downloads/Model_M3.vrm",
+  "motion_file": "sample/WORD2153_3d_approx.json",
+  "profile_file": "retarget_profile.json",
+  "output_dir": "output"
+}
+
