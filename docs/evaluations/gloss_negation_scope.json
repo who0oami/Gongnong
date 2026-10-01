@@ -1,0 +1,322 @@
+{
+  "models": [
+    "qwen2.5:3b",
+    "qwen2.5:7b"
+  ],
+  "prompt": "existing _SYSTEM_PROMPT; unchanged",
+  "options": {
+    "temperature": 0,
+    "top_p": 0.9,
+    "format": "json"
+  },
+  "method": "12 controlled Korean sentences per model; one call per sentence. Not an accuracy benchmark. Source expectations recorded before inference.",
+  "results": [
+    {
+      "model": "qwen2.5:3b",
+      "input": "학교에 가지 않아요.",
+      "expected_meaning": "가다 부정",
+      "glosses": [
+        "나",
+        "학교",
+        "가다",
+        "않다"
+      ],
+      "seconds": 6.34
+    },
+    {
+      "model": "qwen2.5:3b",
+      "input": "학교에 갈 필요가 없어요.",
+      "expected_meaning": "가다 필요 없음; 금지 아님",
+      "glosses": [
+        "학교",
+        "가다",
+        "필요",
+        "없다"
+      ],
+      "seconds": 0.34
+    },
+    {
+      "model": "qwen2.5:3b",
+      "input": "학교에 가면 안 돼요.",
+      "expected_meaning": "가다 금지",
+      "glosses": [
+        "학교",
+        "가다",
+        "안",
+        "들어가다"
+      ],
+      "seconds": 0.39
+    },
+    {
+      "model": "qwen2.5:3b",
+      "input": "학교에 가도 돼요.",
+      "expected_meaning": "가다 허락",
+      "glosses": [
+        "학교",
+        "가다",
+        "돼다"
+      ],
+      "seconds": 0.29
+    },
+    {
+      "model": "qwen2.5:3b",
+      "input": "문을 열고 창문은 닫지 마세요.",
+      "expected_meaning": "문 열기 긍정; 창문 닫기 금지",
+      "glosses": [
+        "문",
+        "열다",
+        "창문",
+        "닫다",
+        "하지마다"
+      ],
+      "seconds": 0.43
+    },
+    {
+      "model": "qwen2.5:3b",
+      "input": "문을 열지 말고 창문을 닫으세요.",
+      "expected_meaning": "문 열기 금지; 창문 닫기 긍정",
+      "glosses": [
+        "문",
+        "열다",
+        "창문",
+        "닫다"
+      ],
+      "seconds": 0.36
+    },
+    {
+      "model": "qwen2.5:3b",
+      "input": "상자를 지키고 있지만 겁먹을 필요는 없어요.",
+      "expected_meaning": "지키기 긍정; 겁먹기 필요 없음",
+      "glosses": [
+        "상자",
+        "지키다",
+        "하지만",
+        "겁먹다",
+        "의미없다"
+      ],
+      "seconds": 0.51
+    },
+    {
+      "model": "qwen2.5:3b",
+      "input": "오른쪽으로 가지 말고 왼쪽으로 가세요.",
+      "expected_meaning": "오른쪽 이동 금지; 왼쪽 이동 긍정",
+      "glosses": [
+        "오른쪽",
+        "으로",
+        "가지",
+        "말다",
+        "왼쪽",
+        "으로",
+        "가다",
+        "세요"
+      ],
+      "seconds": 0.6
+    },
+    {
+      "model": "qwen2.5:3b",
+      "input": "왼쪽으로 가지 말고 오른쪽으로 가세요.",
+      "expected_meaning": "왼쪽 이동 금지; 오른쪽 이동 긍정",
+      "glosses": [
+        "왼쪽",
+        "으로",
+        "가다",
+        "말다",
+        "오른쪽",
+        "으로",
+        "가다",
+        "세요"
+      ],
+      "seconds": 0.59
+    },
+    {
+      "model": "qwen2.5:3b",
+      "input": "민수는 수영을 못 하지만 지수는 수영을 할 수 있어요.",
+      "expected_meaning": "민수 수영 불가능; 지수 수영 가능",
+      "glosses": [
+        "민수",
+        "수영",
+        "못하다",
+        "지수",
+        "수영",
+        "할 수 있다"
+      ],
+      "seconds": 0.54
+    },
+    {
+      "model": "qwen2.5:3b",
+      "input": "어제는 가지 않았지만 내일은 갈 거예요.",
+      "expected_meaning": "어제 가기 부정; 내일 가기 긍정",
+      "glosses": [
+        "어제",
+        "가지다",
+        "않다",
+        "하지만",
+        "내일",
+        "갈다",
+        "거다"
+      ],
+      "seconds": 0.45
+    },
+    {
+      "model": "qwen2.5:3b",
+      "input": "사과 세 개가 아니라 배 두 개를 주세요.",
+      "expected_meaning": "사과 세 개 부정; 배 두 개 요청",
+      "glosses": [
+        "사과",
+        "세",
+        "개",
+        "아니라",
+        "배",
+        "두",
+        "개",
+        "주다"
+      ],
+      "seconds": 0.42
+    },
+    {
+      "model": "qwen2.5:7b",
+      "input": "학교에 가지 않아요.",
+      "expected_meaning": "가다 부정",
+      "error": "Gloss에 허용되지 않은 문자(외국어 또는 기호)가 포함되어 있습니다.",
+      "seconds": 8.33
+    },
+    {
+      "model": "qwen2.5:7b",
+      "input": "학교에 갈 필요가 없어요.",
+      "expected_meaning": "가다 필요 없음; 금지 아님",
+      "glosses": [
+        "학교",
+        "갈",
+        "필요",
+        "없다"
+      ],
+      "seconds": 0.74
+    },
+    {
+      "model": "qwen2.5:7b",
+      "input": "학교에 가면 안 돼요.",
+      "expected_meaning": "가다 금지",
+      "glosses": [
+        "학교",
+        "가",
+        "안 돼"
+      ],
+      "seconds": 0.66
+    },
+    {
+      "model": "qwen2.5:7b",
+      "input": "학교에 가도 돼요.",
+      "expected_meaning": "가다 허락",
+      "glosses": [
+        "학교",
+        "가",
+        "도",
+        "돼"
+      ],
+      "seconds": 0.64
+    },
+    {
+      "model": "qwen2.5:7b",
+      "input": "문을 열고 창문은 닫지 마세요.",
+      "expected_meaning": "문 열기 긍정; 창문 닫기 금지",
+      "glosses": [
+        "문",
+        "열다",
+        "창문",
+        "닫지 말아라"
+      ],
+      "seconds": 0.94
+    },
+    {
+      "model": "qwen2.5:7b",
+      "input": "문을 열지 말고 창문을 닫으세요.",
+      "expected_meaning": "문 열기 금지; 창문 닫기 긍정",
+      "glosses": [
+        "문",
+        "열",
+        "말다",
+        "창문",
+        "닫",
+        "말다"
+      ],
+      "seconds": 0.98
+    },
+    {
+      "model": "qwen2.5:7b",
+      "input": "상자를 지키고 있지만 겁먹을 필요는 없어요.",
+      "expected_meaning": "지키기 긍정; 겁먹기 필요 없음",
+      "glosses": [
+        "상자",
+        "지키다",
+        "하지만",
+        "겁먹다",
+        "필요",
+        "없다"
+      ],
+      "seconds": 1.22
+    },
+    {
+      "model": "qwen2.5:7b",
+      "input": "오른쪽으로 가지 말고 왼쪽으로 가세요.",
+      "expected_meaning": "오른쪽 이동 금지; 왼쪽 이동 긍정",
+      "glosses": [
+        "오른쪽",
+        "가지",
+        "말다",
+        "왼쪽",
+        "가다"
+      ],
+      "seconds": 1.04
+    },
+    {
+      "model": "qwen2.5:7b",
+      "input": "왼쪽으로 가지 말고 오른쪽으로 가세요.",
+      "expected_meaning": "왼쪽 이동 금지; 오른쪽 이동 긍정",
+      "glosses": [
+        "왼쪽",
+        "오른쪽",
+        "가"
+      ],
+      "seconds": 0.8
+    },
+    {
+      "model": "qwen2.5:7b",
+      "input": "민수는 수영을 못 하지만 지수는 수영을 할 수 있어요.",
+      "expected_meaning": "민수 수영 불가능; 지수 수영 가능",
+      "glosses": [
+        "민수",
+        "수영",
+        "못하다",
+        "지만",
+        "지수",
+        "수영",
+        "할",
+        "수",
+        "있다"
+      ],
+      "seconds": 1.4
+    },
+    {
+      "model": "qwen2.5:7b",
+      "input": "어제는 가지 않았지만 내일은 갈 거예요.",
+      "expected_meaning": "어제 가기 부정; 내일 가기 긍정",
+      "error": "Gloss에 허용되지 않은 문자(외국어 또는 기호)가 포함되어 있습니다.",
+      "seconds": 1.16
+    },
+    {
+      "model": "qwen2.5:7b",
+      "input": "사과 세 개가 아니라 배 두 개를 주세요.",
+      "expected_meaning": "사과 세 개 부정; 배 두 개 요청",
+      "glosses": [
+        "배",
+        "두",
+        "개",
+        "주다",
+        "사과",
+        "세",
+        "개"
+      ],
+      "seconds": 1.06
+    }
+  ]
+}

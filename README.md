@@ -1,26 +1,26 @@
 # KSL-Tube 인수인계 및 실행 가이드
 
-YouTube 자막을 한국수어(KSL) Gloss로 변환하고 아바타 클립을 합성하는 서비스입니다. 이 문서는 `jaeyeong/frontend-backend-convert` 브랜치의 실제 구현을 기준으로 합니다.
+YouTube 자막을 한국수어(KSL) Gloss로 변환하고 아바타 클립을 합성하는 서비스입니다. 이 문서는 `jihyun/local-llm-s3-integration`의 통합 코드를 기준으로 합니다. 팀원의 Convert·S3·DB 코드에 Local LLM 의미 검증과 캡션 처리를 합쳤으며, 실제 공용 서비스 E2E 성공을 뜻하지는 않습니다.
 
 ## 1. 현재 구현 상태
 
 - **Frontend ↔ Backend 연동 완료**: React/Vite에서 FastAPI의 인증, 온보딩, 번역 Job 생성·조회, 결과 영상 재생, History API를 호출합니다. 전체 외부 서비스 E2E 재검증은 남아 있습니다.
 - **공용 DB는 Supabase PostgreSQL**이며 SQLAlchemy로 접근하고 **Alembic으로 schema를 관리**합니다. SQLite는 격리 테스트용입니다.
 - Gemini는 YouTube 자막의 **문맥·맞춤법·ASR 오인식 보정**에 사용합니다. 영상 제목·설명과 전체 자막을 함께 전달하고 원문·시간 구간을 유지하며 `corrected_text`를 저장합니다. 교정 호출 실패 시 원문으로 진행합니다.
-- **현재 Gloss 변환도 Gemini 기반**입니다. `GeminiKSLConverter`가 교정 문장을 변환합니다. 일부 데모 문장은 `demo_gloss_override.py`의 고정 코드로 대체되며 Gloss 프롬프트에는 임시 구현 TODO가 남아 있습니다.
-- `jihyun/local-llm-semantic-integration`의 **Ollama/Qwen Local LLM은 이 브랜치에 아직 통합되지 않았습니다.** 환경변수만 설정해도 변환기가 바뀌지 않습니다.
+- **Gloss 변환은 기본 Ollama/Qwen**입니다. `ConfiguredKSLConverter`가 `KSL_GLOSS_PROVIDER` 설정에 따라 교정 문장을 변환합니다. 일부 데모 문장은 `demo_gloss_override.py`의 고정 코드로 대체되므로 실제 모델 평가 시 구분합니다.
+- 의미 검증 실패는 해당 구간 캡션으로 복구하고, 일반 미매칭 단어는 매칭된 클립과 함께 캡션으로 표시합니다. 모델 통신 실패는 Job 실패로 처리합니다.
 
 현재 일반 변환 흐름:
 
 ```text
-YouTube 자막 → Gemini 자막 교정 → Gemini Gloss → WORD 등 코드 매핑
+YouTube 자막 → Gemini 자막 교정 → Ollama/Qwen Gloss → WORD/SEN 코드 매핑
 → S3 WORD 클립 다운로드 → 타임라인 구성 → FFmpeg → 결과 영상
 ```
 
-향후 Local LLM 통합 예상 구조:
+클립 공급 경로:
 
 ```text
-Gemini 자막 교정 → Ollama/Qwen Gloss → WORD → S3 → FFmpeg
+WORD → S3 / SEN → 로컬 파일 → FFmpeg
 ```
 
 ## 2. 준비 사항
@@ -33,14 +33,16 @@ Gemini 자막 교정 → Ollama/Qwen Gloss → WORD → S3 → FFmpeg
 | FFmpeg / ffprobe | 길이 측정·합성. 둘 다 PATH 등록, `libx264` 사용 가능 빌드 필요 |
 | AWS CLI | 로컬 S3 인증·접근 확인용. 백엔드 다운로드는 boto3 사용 |
 | PostgreSQL libpq 또는 psycopg binary extra | PostgreSQL 드라이버 로딩에 필요. 아래 설치 안내 참고 |
-| Ollama (향후) | Local LLM 통합 후 Qwen 실행용. 현재 실행에는 불필요 |
+| Ollama | 기본 Gloss 변환 실행용. `ollama pull qwen2.5:3b`로 모델 준비 |
 
 팀의 보안 채널로 Supabase 연결 정보, Gemini API key, AWS 접근 권한을 전달받습니다. 실제 비밀번호와 키는 문서·Git·프런트엔드 환경변수에 넣지 않습니다.
 
 ## 3. Clone 및 Python 설치
 
+아래 clone 명령은 통합 브랜치가 원격에 게시된 뒤 사용합니다. 아직 로컬 작업 중이면 해당 worktree에서 이어서 실행합니다.
+
 ```bash
-git clone --branch jaeyeong/frontend-backend-convert https://github.com/ssica16/ksl-tube.git
+git clone --branch jihyun/local-llm-s3-integration https://github.com/ssica16/ksl-tube.git
 cd ksl-tube
 ```
 
@@ -84,7 +86,9 @@ python -m pip install "psycopg[binary]==3.3.5"
 | --- | --- |
 | `DATABASE_URL` | Supabase PostgreSQL URL. 드라이버 `postgresql+psycopg`, SSL `sslmode=require` |
 | `JWT_SECRET` | 충분히 긴 무작위 문자열. 예제는 비워 두었으며 미설정 시 서버 시작 불가 |
-| `GEMINI_API_KEY` | 자막 교정과 현재 Gloss 변환에 사용 |
+| `GEMINI_API_KEY` | 자막 교정에 사용. Gloss는 gemini provider 선택 시에만 사용 |
+| `KSL_GLOSS_PROVIDER` | 기본 `local`, 비교용 `gemini` |
+| `OLLAMA_BASE_URL`, `OLLAMA_GLOSS_MODEL` | 기본 `http://127.0.0.1:11434`, `qwen2.5:3b` |
 | `S3_CLIP_BUCKET` | `ksl-tube-avatar-clips` |
 | `AWS_PROFILE`, `AWS_DEFAULT_REGION` | 필요한 경우 사용할 AWS 프로필과 실제 버킷 리전 설정 |
 
@@ -98,7 +102,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 
 끝에 `/`를 붙이지 않습니다. `VITE_` 변수는 브라우저 번들에 노출되므로 DB 비밀번호·AWS/Gemini key·JWT secret을 넣으면 안 됩니다. 변경 후 Vite를 재시작합니다. 현재 Vite에는 API 프록시가 없으므로 로컬에서는 주소를 비워 두지 않습니다.
 
-Local LLM 환경변수는 루트 예제에 주석 처리된 **향후 통합 예정** 항목만 있습니다. 이름·모델 태그는 통합 시 확정해야 하며 현재 코드는 읽지 않습니다.
+Local LLM 설정은 루트 `.env.example`을 따릅니다. 변수 변경 후 Backend를 재시작합니다. Ollama가 Backend에서 접근 가능한 주소에서 실행 중이어야 합니다.
 
 ## 5. Supabase 최초 연결 및 schema 적용
 
@@ -228,8 +232,111 @@ git status --short
 
 ## 10. 남은 작업 및 협업
 
-- **Local LLM 통합**: `jihyun/local-llm-semantic-integration`을 검토하고 `KSLConverter.convert(text) -> list[str]` 계약과 `KSLConversionError`에 맞춰 Ollama/Qwen을 연결합니다. Gemini 자막 교정은 유지하고 Gloss 변환기를 교체합니다.
+환경변수를 팀원과 공유해야 하는 경우 실제 값은 제외하고 `.env.example` 파일을 사용합니다.
+
+---
+
+## 🤖 Local LLM Gloss 변환
+
+외부 LLM API quota에 의존하지 않고 개발 및 E2E 테스트를 진행할 수 있도록
+한국어 문장을 KSL Gloss 문자열 배열로 변환하는 로컬 LLM 경로를 제공합니다.
+
+기존 Backend 계약인 `convert_to_gloss(korean_text: str) -> list[str]`은 유지하며,
+팀의 `KSLConverter` 계약으로 연결하고, CSV 매핑 뒤 Job별 S3 다운로드 경로를 Timeline / Renderer에 전달합니다.
+
+### 처리 흐름
+
+```text
+한국어 자막
+  → Local LLM (Ollama + Qwen)
+  → KSL Gloss 문자열 배열
+  → Gloss Matcher
+  → WORD / SEN asset code
+  → Timeline / Avatar
+```
+
+### 1. Ollama 및 모델 준비
+
+Ollama가 설치되어 있는지 확인합니다.
+
+```bash
+ollama --version
+```
+
+기본 모델을 내려받습니다.
+
+```bash
+ollama pull qwen2.5:3b
+ollama list
+```
+
+### 2. 환경변수
+
+`.env.example`을 참고해 설정합니다.
+
+```env
+KSL_GLOSS_PROVIDER=local
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_GLOSS_MODEL=qwen2.5:3b
+```
+
+별도 설정이 없으면 Gloss 변환 provider는 `local`, 모델은 `qwen2.5:3b`을 기본값으로 사용합니다.
+
+기존 Gemini Gloss 경로로 비교 또는 롤백하려면:
+
+```env
+KSL_GLOSS_PROVIDER=gemini
+GEMINI_API_KEY=your_api_key
+GEMINI_GLOSS_MODEL=gemini-flash-lite-latest
+```
+
+> 기존 자막 보정 서비스(`llm_subtitle_correction_service.py`)는 별도로 Gemini를 사용하므로,
+> 전체 E2E 실행 시에는 Gloss provider를 local로 설정해도 Gemini API key/quota가 필요할 수 있습니다.
+
+### 3. Local Gloss 단독 실행 테스트
+
+프로젝트의 `backend` 디렉터리에서 실행합니다.
+
+```bash
+cd backend
+python -c "from services.llm_gloss_service import convert_to_gloss; print(convert_to_gloss('나는 학교에 가요.'))"
+```
+
+예시 출력:
+
+```text
+['나', '학교', '가다']
+```
+
+### 4. 테스트
+
+프로젝트 루트에서:
+
+```bash
+PYTHONPATH=backend python -m unittest tests/test_local_llm_gloss_service.py -v
+```
+
+### 구현 위치
+
+- `backend/services/llm_gloss_service.py`: Local/Gemini provider facade 및 기존 호출 계약 유지
+- `backend/services/local_llm_gloss_service.py`: Ollama 호출, structured JSON 출력 및 Gloss 파싱
+- `backend/services/gloss_matcher.py`: 생성된 Gloss를 기존 WORD/SEN asset으로 매핑
+- `tests/test_local_llm_gloss_service.py`: Local LLM 응답 파싱/요청 계약 테스트
+
+### 현재 검증 범위 및 한계
+
+로컬 환경에서 Ollama + `qwen2.5:3b` 호출과 한국어 → Gloss 변환이 동작하는 것을 확인했습니다.
+예를 들어 `나는 학교에 가요.`는 `['나', '학교', '가다']`,
+`나는 커피를 마시지 않아요.`는 `['나', '커피', '마시다', '않다']` 형태로 변환됩니다.
+
+다만 LLM이 생성한 자연스러운 Gloss가 현재 WORD/SEN asset vocabulary와 항상 일치하는 것은 아닙니다.
+따라서 Local LLM 연결 및 Gloss 생성 경로는 구현되어 있으나,
+조사 정규화·SEN 문장 매핑·의미 검증은 반영되어 있습니다. 퍼지 매칭은 의미가 다른 단어로 연결되는 사례 때문에 사용하지 않습니다. CSV 매칭과 실제 수어 의미의 정확성은 구분해서 평가합니다.
+
+이번 통합 범위와 검증 결과는 [Local LLM·S3 통합 기록](docs/local_llm_s3_integration.md)을 참고합니다.
+
+- **Local LLM·S3 통합 검증**: `KSLConverter.convert(text) -> list[str]` 계약으로 연결했습니다. 실제 모델·공용 DB·S3를 함께 사용하는 검증은 아래 E2E 범위로 확인합니다.
 - **전체 E2E 재검증**: 실제 공용 DB와 외부 API/S3/FFmpeg를 사용하는 변환, 인증, History CRUD 및 실패 경로를 재검증합니다.
 - **배포환경 성능 측정**: 자막 교정·Gloss·S3·FFmpeg 단계별 시간, 동시 Job의 CPU/메모리·임시 디스크 사용량을 측정합니다. 결과 파일 보관, 작업 큐/재시작 복구, CORS origin 제한도 배포 구성에서 검토합니다.
 
-이 브랜치 작업을 이어갈 때는 `git pull --ff-only origin jaeyeong/frontend-backend-convert`로 동기화합니다. `.env`, `frontend/.env.local` 및 실제 secret이 들어간 파일은 절대 커밋하지 않습니다. 공유 설정은 예제 파일만 수정하고 코드/schema 변경은 관련 migration과 함께 PR로 검토합니다.
+이 브랜치가 원격에 게시된 이후에는 `git pull --ff-only origin jihyun/local-llm-s3-integration`로 동기화합니다. `.env`, `frontend/.env.local` 및 실제 secret이 들어간 파일은 절대 커밋하지 않습니다. 공유 설정은 예제 파일만 수정하고 코드/schema 변경은 관련 migration과 함께 PR로 검토합니다.

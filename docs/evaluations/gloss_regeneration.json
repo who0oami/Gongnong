@@ -1,0 +1,222 @@
+[
+  {
+    "input": "오늘 비가 와요.",
+    "glosses": [
+      "오늘",
+      "비",
+      "오다"
+    ],
+    "matches": [
+      {
+        "gloss": "오늘",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      },
+      {
+        "gloss": "비",
+        "matched": true,
+        "matched_word": "비",
+        "source": "WORD",
+        "code": "WORD2552",
+        "match_type": "exact"
+      },
+      {
+        "gloss": "오다",
+        "matched": true,
+        "matched_word": "오다",
+        "source": "WORD",
+        "code": "WORD1149",
+        "match_type": "exact"
+      }
+    ]
+  },
+  {
+    "input": "문을 열고 창문은 닫지 마세요.",
+    "glosses": [
+      "문",
+      "열다",
+      "창문",
+      "닫다",
+      "금지"
+    ],
+    "matches": [
+      {
+        "gloss": "문",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      },
+      {
+        "gloss": "열다",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      },
+      {
+        "gloss": "창문",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      },
+      {
+        "gloss": "닫다",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      },
+      {
+        "gloss": "금지",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      }
+    ]
+  },
+  {
+    "input": "문을 열지 말고 창문을 닫으세요.",
+    "error": "재생성 후에도 검증 실패: Gloss 의미 보존 검증 실패: modality_changed"
+  },
+  {
+    "input": "나는 커피를 마시지 않아요.",
+    "glosses": [
+      "나",
+      "커피",
+      "마시다",
+      "않다"
+    ],
+    "matches": [
+      {
+        "gloss": "나",
+        "matched": true,
+        "matched_word": "나",
+        "source": "WORD",
+        "code": "WORD1157",
+        "match_type": "exact"
+      },
+      {
+        "gloss": "커피",
+        "matched": true,
+        "matched_word": "커피",
+        "source": "WORD",
+        "code": "WORD0115",
+        "match_type": "exact"
+      },
+      {
+        "gloss": "마시다",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      },
+      {
+        "gloss": "않다",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      }
+    ]
+  },
+  {
+    "input": "상자를 지키고 있지만 겁먹을 필요는 없어요.",
+    "error": "재생성 후에도 검증 실패: Gloss 의미 보존 검증 실패: modality_changed, malformed_dictionary_form"
+  },
+  {
+    "input": "오른쪽으로 가지 말고 왼쪽으로 가세요.",
+    "glosses": [
+      "오른쪽",
+      "으로",
+      "가지",
+      "말다",
+      "왼쪽",
+      "으로",
+      "가다",
+      "세요"
+    ],
+    "matches": [
+      {
+        "gloss": "오른쪽",
+        "matched": true,
+        "matched_word": "오른쪽",
+        "source": "WORD",
+        "code": "WORD1343",
+        "match_type": "exact"
+      },
+      {
+        "gloss": "으로",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      },
+      {
+        "gloss": "가지",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      },
+      {
+        "gloss": "말다",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      },
+      {
+        "gloss": "왼쪽",
+        "matched": true,
+        "matched_word": "왼쪽",
+        "source": "WORD",
+        "code": "WORD1342",
+        "match_type": "exact"
+      },
+      {
+        "gloss": "으로",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      },
+      {
+        "gloss": "가다",
+        "matched": true,
+        "matched_word": "가다",
+        "source": "WORD",
+        "code": "WORD0943",
+        "match_type": "exact"
+      },
+      {
+        "gloss": "세요",
+        "matched": false,
+        "matched_word": null,
+        "source": null,
+        "code": null,
+        "match_type": null
+      }
+    ]
+  },
+  {
+    "input": "학교에 갈 필요가 없어요.",
+    "error": "재생성 후에도 검증 실패: Gloss 의미 보존 검증 실패: malformed_dictionary_form"
+  }
+]
