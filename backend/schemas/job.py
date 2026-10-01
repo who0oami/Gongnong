@@ -17,12 +17,14 @@ class JobSegment(BaseModel):
     start: float
     end: float
     source_text: str
+    corrected_text: Optional[str] = None
     ksl_text: Optional[str] = None
 
 
 class JobResult(BaseModel):
     transcript: str
     segments: list[JobSegment]
+    video_url: Optional[str] = None
 
 
 class Job(BaseModel):
