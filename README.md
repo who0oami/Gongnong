@@ -36,6 +36,8 @@ BiGRU는 시계열 보정 가능성을 확인하기 위한 실험으로 진행�
 
 관련 코드는 [KNN·자음 Avatar 실험](experiments/consonants_knn_jihyeon_v1/)에서 확인할 수 있습니다.
 
+기술 블로그: [수어 Avatar의 손 모양을 KNN으로 보정한 과정](https://who0oami.github.io/posts/knn-hand-correction.html)
+
 ## KSL Gloss 모델 실험
 
 ### Gemini 비용 문제에서 Local LLM까지
@@ -59,9 +61,7 @@ BiGRU는 시계열 보정 가능성을 확인하기 위한 실험으로 진행�
    - 배포 환경은 안정성이 검증된 Gemini를 기본값으로 유지
    - Local LLM과 mT5는 비용·성능 비교와 후속 개선을 위한 실험 경로로 보존
 
-> mT5 학습 결과, 모델별 비교, Ollama/Qwen 프롬프트 개선 과정은 기술 블로그에 별도로 정리하고 링크를 추가할 예정입니다.
-
-<!-- TODO: mT5·Local LLM 기술 블로그 링크 추가 -->
+기술 블로그: [Gemini에서 Local LLM까지: KSL Gloss 변환 실험](https://who0oami.github.io/posts/gemini-to-local-llm.html)
 
 관련 코드는 [mT5 학습·추론](ai/)과 [Local LLM 검증](experiments/local_llm_validation/)에서 확인할 수 있습니다.
 
@@ -171,9 +171,7 @@ React Router의 Client-side route에 직접 접근하거나 새로고침하면 V
 
 Vercel rewrite 설정으로 모든 경로를 index.html에 연결해 SPA Router가 경로를 처리하도록 수정했습니다. 배포 환경에서 변환 페이지를 새로고침해도 화면과 Job 조회가 이어지는 것을 확인했습니다.
 
-> 배포 환경에서 발생한 오류 로그와 단계별 해결 과정도 기술 블로그에 정리하고 링크를 추가할 예정입니다.
-
-<!-- TODO: 배포·FFmpeg 트러블슈팅 기술 블로그 링크 추가 -->
+기술 블로그: [Render 무료 서버에서 FFmpeg를 4배 빠르게 만들기](https://who0oami.github.io/posts/render-ffmpeg.html)
 
 ## 작업 결과
 
